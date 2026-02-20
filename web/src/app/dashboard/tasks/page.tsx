@@ -2,209 +2,145 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ClipboardList,
+  PlusCircle,
+  DollarSign,
+  Calendar,
+} from "lucide-react";
 import { getToken } from "@/lib/auth";
-import { getMyAgents, type AgentProfile } from "@/lib/api";
-import { getCreatorTasks, type Task } from "@/lib/tasks";
-import TaskCard from "@/components/task-card";
-import { ClipboardList, Plus, Search } from "lucide-react";
+import { listMyTasks, listIncomingTasks } from "@/lib/api";
+import type { AgentTask } from "@/lib/api";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { timeAgo } from "@/lib/utils";
 
-type StatusGroup = "active" | "pending" | "completed" | "failed";
+const statusColors: Record<string, string> = {
+  posted: "bg-zinc-500/10 text-zinc-400",
+  assigned: "bg-blue-500/10 text-blue-400",
+  dispatched: "bg-yellow-500/10 text-yellow-400",
+  dispatch_failed: "bg-red-500/10 text-red-400",
+  in_progress: "bg-teal-500/10 text-teal-400",
+  completed: "bg-emerald-500/10 text-emerald-400",
+  failed: "bg-red-500/10 text-red-400",
+};
 
-function groupStatus(status: Task["status"]): StatusGroup {
-  if (status === "executing" || status === "assigned") return "active";
-  if (status === "pending") return "pending";
-  if (status === "completed") return "completed";
-  return "failed";
+type TabKey = "posted" | "incoming";
+
+function TaskRow({ task }: { task: AgentTask }) {
+  const colors = statusColors[task.status] || statusColors.posted;
+  return (
+    <Link href={`/tasks/${task.id}`}>
+      <Card hover className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-heading font-bold text-foreground text-sm truncate">
+              {task.title}
+            </h3>
+            <p className="text-muted text-xs mt-1 line-clamp-1">{task.description}</p>
+          </div>
+          <span className={`inline-flex items-center px-2.5 py-1 rounded-xl text-xs font-medium shrink-0 ${colors}`}>
+            {task.status.replace(/_/g, " ")}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4 mt-3 text-xs text-muted">
+          {task.agent_name && (
+            <span>{task.agent_name}</span>
+          )}
+          <span className="flex items-center gap-1">
+            <DollarSign className="w-3 h-3" />
+            {(task.budget_cents / 100).toFixed(0)}
+          </span>
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Due {new Date(task.deadline).toLocaleDateString()}
+          </span>
+          <span className="ml-auto text-muted-2">{timeAgo(task.created_at)}</span>
+        </div>
+      </Card>
+    </Link>
+  );
 }
 
-const STATUS_ORDER: StatusGroup[] = ["active", "pending", "completed", "failed"];
-
-const STATUS_LABELS: Record<StatusGroup, string> = {
-  active: "In Progress",
-  pending: "Pending",
-  completed: "Completed",
-  failed: "Failed / Cancelled",
-};
-
-const STATUS_ICONS: Record<StatusGroup, string> = {
-  active: "text-accent",
-  pending: "text-[var(--warning)]",
-  completed: "text-[var(--success)]",
-  failed: "text-destructive",
-};
-
-export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [agents, setAgents] = useState<AgentProfile[]>([]);
+export default function DashboardTasksPage() {
+  const router = useRouter();
+  const [tab, setTab] = useState<TabKey>("posted");
+  const [myTasks, setMyTasks] = useState<AgentTask[]>([]);
+  const [incoming, setIncoming] = useState<AgentTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterAgent, setFilterAgent] = useState("");
-  const [filterStatus, setFilterStatus] = useState<StatusGroup | "all">("all");
-  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const token = getToken();
     if (!token) return;
-
-    Promise.all([
-      getCreatorTasks(token).catch(() => []),
-      getMyAgents(token).catch(() => []),
-    ]).then(([t, a]) => {
-      setTasks(t);
-      setAgents(a);
-      setLoading(false);
-    });
+    setLoading(true);
+    Promise.all([listMyTasks(token), listIncomingTasks(token)])
+      .then(([m, i]) => { setMyTasks(m); setIncoming(i); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  // Polling for active tasks
-  useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-
-    const interval = setInterval(() => {
-      getCreatorTasks(token)
-        .then(setTasks)
-        .catch(() => {});
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const filtered = tasks.filter((t) => {
-    if (filterAgent && t.assigned_agent_id !== filterAgent) return false;
-    if (filterStatus !== "all" && groupStatus(t.status) !== filterStatus) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q) ||
-        t.assigned_agent_name?.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
-
-  const grouped = STATUS_ORDER.map((group) => ({
-    group,
-    tasks: filtered.filter((t) => groupStatus(t.status) === group),
-  })).filter((g) => g.tasks.length > 0);
-
-  const inputClass =
-    "bg-[var(--bg-secondary)] border border-border rounded-lg px-3 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-accent/50";
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-40 bg-border rounded animate-pulse" />
-          <div className="h-9 w-28 bg-border rounded animate-pulse" />
-        </div>
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-24 bg-surface border border-border rounded-xl animate-pulse" />
-        ))}
-      </div>
-    );
-  }
+  const tasks = tab === "posted" ? myTasks : incoming;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">Task Command Center</h1>
-          <p className="text-sm text-muted mt-0.5">
-            {tasks.length} task{tasks.length !== 1 ? "s" : ""} across your fleet
-          </p>
-        </div>
-        <Link
-          href="/dashboard/tasks/new"
-          className="flex items-center gap-2 bg-accent text-[var(--background)] font-semibold rounded-lg px-4 py-2 text-sm hover:bg-accent-hover transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Post Task
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          Tasks
+        </h1>
+        <Link href="/dashboard/tasks/new">
+          <Button className="gap-2">
+            <PlusCircle className="w-4 h-4" /> Post Task
+          </Button>
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={filterAgent}
-          onChange={(e) => setFilterAgent(e.target.value)}
-          className={inputClass}
+      {/* Tab toggle */}
+      <div className="flex items-center gap-1 bg-surface rounded-2xl p-1.5 mb-6">
+        <button
+          onClick={() => setTab("posted")}
+          className={`flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            tab === "posted" ? "bg-surface-2 text-accent" : "text-muted hover:text-foreground"
+          }`}
         >
-          <option value="">All Agents</option>
-          {agents.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as StatusGroup | "all")}
-          className={inputClass}
+          My Posted Tasks ({myTasks.length})
+        </button>
+        <button
+          onClick={() => setTab("incoming")}
+          className={`flex-1 text-center px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+            tab === "incoming" ? "bg-surface-2 text-accent" : "text-muted hover:text-foreground"
+          }`}
         >
-          <option value="all">All Statuses</option>
-          {STATUS_ORDER.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className={`${inputClass} pl-9 w-full`}
-            placeholder="Search tasks..."
-          />
-        </div>
+          Incoming Tasks ({incoming.length})
+        </button>
       </div>
 
-      {/* Task groups */}
-      {filtered.length === 0 ? (
-        <div className="bg-surface border border-border rounded-xl p-12 text-center">
-          <ClipboardList className="w-12 h-12 text-muted/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-            {tasks.length === 0 ? "No tasks yet" : "No matching tasks"}
-          </h3>
-          <p className="text-muted text-sm mb-6 max-w-md mx-auto">
-            {tasks.length === 0
-              ? "When buyers send tasks to your agents, they'll appear here."
-              : "Try adjusting your filters."}
-          </p>
-          {tasks.length === 0 && (
-            <Link
-              href="/dashboard/tasks/new"
-              className="inline-flex items-center gap-2 bg-accent text-[var(--background)] font-semibold rounded-lg px-4 py-2 text-sm hover:bg-accent-hover transition-colors"
-            >
-              <Plus className="w-4 h-4" /> Post Your First Task
-            </Link>
-          )}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface animate-pulse rounded-2xl h-24" />
+          ))}
         </div>
+      ) : tasks.length === 0 ? (
+        <EmptyState
+          icon={<ClipboardList className="w-12 h-12" />}
+          heading={tab === "posted" ? "No tasks posted" : "No incoming tasks"}
+          description={
+            tab === "posted"
+              ? "Post a task to get work done by a docked agent."
+              : "Tasks assigned to your agents will appear here."
+          }
+          actionLabel={tab === "posted" ? "Post a Task" : "Browse Agents"}
+          onAction={() =>
+            router.push(tab === "posted" ? "/dashboard/tasks/new" : "/browse")
+          }
+        />
       ) : (
-        <div className="space-y-6">
-          {grouped.map(({ group, tasks: groupTasks }) => (
-            <div key={group}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className={`w-2 h-2 rounded-full ${
-                  group === "active" ? "bg-accent animate-pulse" :
-                  group === "pending" ? "bg-[var(--warning)]" :
-                  group === "completed" ? "bg-[var(--success)]" :
-                  "bg-destructive"
-                }`} />
-                <h3 className={`text-xs font-semibold uppercase tracking-wider ${STATUS_ICONS[group]}`}>
-                  {STATUS_LABELS[group]} ({groupTasks.length})
-                </h3>
-              </div>
-              <div className="space-y-2">
-                {groupTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} viewAs="creator" />
-                ))}
-              </div>
-            </div>
+        <div className="space-y-3">
+          {tasks.map((task) => (
+            <TaskRow key={task.id} task={task} />
           ))}
         </div>
       )}

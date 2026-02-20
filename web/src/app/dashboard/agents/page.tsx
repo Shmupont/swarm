@@ -2,170 +2,121 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Bot, Edit, PlusCircle, Trash2, Rss } from "lucide-react";
 import { getToken } from "@/lib/auth";
-import { getMyAgents, updateAgent, deleteAgent, type AgentProfile } from "@/lib/api";
-import { Plus, Bot, Pencil, ExternalLink, Trash2, Power } from "lucide-react";
+import { listMyAgents, deleteAgentProfile } from "@/lib/api";
+import type { AgentProfile } from "@/lib/api";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { getCategoryLabel } from "@/lib/categories";
 
-export default function AgentsPage() {
+export default function MyAgentsPage() {
+  const router = useRouter();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function load() {
     const token = getToken();
     if (!token) return;
-    getMyAgents(token)
+    setLoading(true);
+    listMyAgents(token)
       .then(setAgents)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }
 
-  async function toggleActive(agent: AgentProfile) {
+  useEffect(load, []);
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     const token = getToken();
     if (!token) return;
     try {
-      const updated = await updateAgent(token, agent.id, { is_active: !agent.is_docked });
-      setAgents((prev) => prev.map((a) => (a.id === agent.id ? updated : a)));
+      await deleteAgentProfile(token, id);
+      load();
     } catch {
-      // ignore
+      alert("Failed to delete agent");
     }
-  }
-
-  async function handleDelete(id: string) {
-    const token = getToken();
-    if (!token) return;
-    if (!confirm("Are you sure you want to undock this agent?")) return;
-    try {
-      await deleteAgent(token, id);
-      setAgents((prev) => prev.filter((a) => a.id !== id));
-    } catch {
-      // ignore
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-32 bg-border rounded animate-pulse" />
-          <div className="h-9 w-32 bg-border rounded animate-pulse" />
-        </div>
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-16 bg-surface border border-border rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">Fleet Management</h1>
-          <p className="text-sm text-muted mt-0.5">{agents.length} agent{agents.length !== 1 ? "s" : ""} docked</p>
-        </div>
-        <Link
-          href="/dashboard/agents/new"
-          className="flex items-center gap-2 bg-accent text-[var(--background)] font-semibold rounded-lg px-4 py-2 text-sm hover:bg-accent-hover transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Dock New Agent
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          My Agents
+        </h1>
+        <Link href="/dashboard/agents/new">
+          <Button className="gap-2">
+            <PlusCircle className="w-4 h-4" /> Create Agent
+          </Button>
         </Link>
       </div>
 
-      {agents.length === 0 ? (
-        <div className="bg-surface border border-border rounded-xl p-12 text-center">
-          <Bot className="w-12 h-12 text-muted/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">No agents docked</h3>
-          <p className="text-muted text-sm mb-6 max-w-md mx-auto">
-            Your digital workforce starts here. Dock your first agent and list it on the Swarm marketplace.
-          </p>
-          <Link
-            href="/dashboard/agents/new"
-            className="inline-flex items-center gap-2 bg-accent text-[var(--background)] font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-accent-hover transition-colors"
-          >
-            <Plus className="w-4 h-4" /> Dock Your First Agent
-          </Link>
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-surface animate-pulse rounded-2xl h-40" />
+          ))}
         </div>
+      ) : agents.length === 0 ? (
+        <EmptyState
+          icon={<Bot className="w-12 h-12" />}
+          heading="No agents yet"
+          description="Create your first AI agent to list it on the SWARM marketplace."
+          actionLabel="Create Agent"
+          onAction={() => router.push("/dashboard/agents/new")}
+        />
       ) : (
-        <div className="bg-surface border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left">
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider">Agent</th>
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden sm:table-cell">Category</th>
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden md:table-cell">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell font-mono">Tasks</th>
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider hidden lg:table-cell font-mono">Earned</th>
-                <th className="px-4 py-3 text-xs font-medium text-muted uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agents.map((agent) => (
-                <tr key={agent.id} className="border-b border-border last:border-0 hover:bg-surface-hover transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      {agent.avatar_url ? (
-                        <img src={agent.avatar_url} alt="" className="w-8 h-8 rounded-lg object-cover" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center text-xs font-bold">
-                          {agent.name[0]?.toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <span className="font-medium text-[var(--foreground)]">{agent.name}</span>
-                        <p className="text-xs text-muted truncate max-w-[200px]">{agent.tagline}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className="text-xs text-muted capitalize">{agent.category.replace(/_/g, " ")}</span>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className={`inline-flex items-center gap-1.5 text-xs ${agent.is_docked ? "text-accent" : "text-muted"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${agent.is_docked ? "bg-accent" : "bg-muted/40"}`} />
-                      {agent.is_docked ? "Active" : "Idle"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell font-mono text-muted">{agent.tasks_completed || 0}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell font-mono text-muted">
-                    ${((agent.total_earned_cents || 0) / 100).toFixed(0)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => toggleActive(agent)}
-                        className="p-1.5 rounded-md text-muted hover:text-accent hover:bg-accent/10 transition-colors"
-                        title={agent.is_docked ? "Pause" : "Activate"}
-                      >
-                        <Power className="w-3.5 h-3.5" />
-                      </button>
-                      <Link
-                        href={`/dashboard/agents/${agent.id}/edit`}
-                        className="p-1.5 rounded-md text-muted hover:text-[var(--foreground)] hover:bg-surface-hover transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Link>
-                      <Link
-                        href={`/agents/${agent.slug}`}
-                        className="p-1.5 rounded-md text-muted hover:text-[var(--foreground)] hover:bg-surface-hover transition-colors"
-                        title="View public profile"
-                        target="_blank"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(agent.id)}
-                        className="p-1.5 rounded-md text-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        title="Undock"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {agents.map((agent) => (
+            <Card key={agent.id} className="p-5">
+              <div className="flex items-start gap-3 mb-3">
+                <Avatar src={agent.avatar_url} name={agent.name} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-heading font-bold text-foreground truncate">
+                    {agent.name}
+                  </h3>
+                  <p className="text-sm text-muted truncate">{agent.tagline || "No tagline"}</p>
+                </div>
+                <div className={`w-2 h-2 rounded-full mt-2 ${agent.is_docked ? "bg-accent" : "bg-muted-2"}`} />
+              </div>
+
+              <div className="flex items-center gap-2 mb-3">
+                <Badge category={agent.category}>
+                  {getCategoryLabel(agent.category)}
+                </Badge>
+                <span className="text-xs text-muted-2 font-mono">/{agent.slug}</span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-3">
+                <Link href={`/dashboard/posts/new?agent=${agent.id}`} className="flex-1">
+                  <Button variant="secondary" size="sm" className="w-full gap-1.5">
+                    <Rss className="w-3.5 h-3.5" /> Post
+                  </Button>
+                </Link>
+                <Link href={`/dashboard/agents/${agent.id}/edit`} className="flex-1">
+                  <Button variant="secondary" size="sm" className="w-full gap-1.5">
+                    <Edit className="w-3.5 h-3.5" /> Edit
+                  </Button>
+                </Link>
+                <Link href={`/agents/${agent.slug}`}>
+                  <Button variant="ghost" size="sm">
+                    View
+                  </Button>
+                </Link>
+                <button
+                  onClick={() => handleDelete(agent.id, agent.name)}
+                  className="p-2 text-muted hover:text-error transition-colors rounded-xl hover:bg-error/10"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
     </div>

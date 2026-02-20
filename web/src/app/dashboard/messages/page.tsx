@@ -1,135 +1,162 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { MessageSquare } from "lucide-react";
 import { getToken } from "@/lib/auth";
-import { getConversations, type Conversation } from "@/lib/api";
-import { MessageSquare, Bot } from "lucide-react";
-
-function timeAgo(ts: string) {
-  const diff = Date.now() - new Date(ts).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
+import { listConversations, createConversation } from "@/lib/api";
+import type { Conversation } from "@/lib/api";
+import { Card } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MessagesPage() {
+  return (
+    <Suspense>
+      <MessagesContent />
+    </Suspense>
+  );
+}
+
+function MessagesContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const agentId = searchParams.get("agent");
+  const agentName = searchParams.get("name");
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [showNew, setShowNew] = useState(!!agentId);
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const token = getToken();
     if (!token) return;
-    getConversations(token)
+    listConversations(token)
       .then(setConversations)
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered =
-    filter === "unread"
-      ? conversations.filter((c) => (c.unread_count || 0) > 0)
-      : conversations;
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="h-6 w-24 bg-border rounded animate-pulse" />
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-20 bg-surface border border-border rounded-lg animate-pulse" />
-        ))}
-      </div>
-    );
+  async function handleCreate() {
+    if (!agentId || !subject.trim() || !message.trim()) return;
+    const token = getToken();
+    if (!token) return;
+    setSending(true);
+    try {
+      const conv = await createConversation(token, {
+        agent_profile_id: agentId,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+      router.push(`/dashboard/messages/${conv.id}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to create conversation");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-[var(--foreground)]">Messages</h1>
-          <p className="text-sm text-muted mt-0.5">{conversations.length} conversation{conversations.length !== 1 ? "s" : ""}</p>
-        </div>
-        <div className="flex gap-1 bg-surface border border-border rounded-lg p-0.5">
-          {(["all", "unread"] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize ${
-                filter === f
-                  ? "bg-accent/15 text-accent"
-                  : "text-muted hover:text-[var(--foreground)]"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          Messages
+        </h1>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="bg-surface border border-border rounded-xl p-12 text-center">
-          <MessageSquare className="w-12 h-12 text-muted/30 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-            {filter === "unread" ? "All caught up" : "No conversations yet"}
-          </h3>
-          <p className="text-muted text-sm">
-            {filter === "unread"
-              ? "You have no unread messages."
-              : "When someone messages you about your agents, conversations will appear here."}
-          </p>
+      {showNew && agentId && (
+        <Card className="p-5 mb-6">
+          <h2 className="font-heading font-bold text-foreground mb-3">
+            New Conversation{agentName ? ` — ${agentName}` : ""}
+          </h2>
+          <div className="space-y-3">
+            <Input
+              label="Subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="What would you like to discuss?"
+            />
+            <div>
+              <label className="block text-sm font-medium text-muted mb-2">
+                Message
+              </label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                placeholder="Write your message..."
+                className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleCreate} disabled={sending}>
+                {sending ? "Sending..." : "Send"}
+              </Button>
+              <Button variant="ghost" onClick={() => setShowNew(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
         </div>
+      ) : conversations.length === 0 && !showNew ? (
+        <EmptyState
+          icon={<MessageSquare className="w-12 h-12" />}
+          heading="No messages yet"
+          description="Start a conversation by contacting an agent from their profile page."
+          actionLabel="Browse Agents"
+          onAction={() => router.push("/browse")}
+        />
       ) : (
-        <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
-          {filtered.map((conv) => {
-            const hasUnread = (conv.unread_count || 0) > 0;
-            return (
-              <Link
-                key={conv.id}
-                href={`/dashboard/messages/${conv.id}`}
-                className={`flex items-center gap-4 px-4 py-3 hover:bg-surface-hover transition-colors ${
-                  hasUnread ? "border-l-2 border-l-accent" : ""
-                }`}
-              >
-                <div className="w-9 h-9 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                  <Bot className="w-4 h-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className={`text-sm truncate ${hasUnread ? "font-semibold text-[var(--foreground)]" : "text-[var(--foreground)]"}`}>
-                      {conv.subject || "Conversation"}
+        <Card>
+          {conversations.map((conv, i) => (
+            <button
+              key={conv.id}
+              onClick={() => router.push(`/dashboard/messages/${conv.id}`)}
+              className={`w-full text-left p-4 hover:bg-surface-2 transition-colors flex items-center gap-3 ${
+                i > 0 ? "border-t border-white/[0.04]" : ""
+              }`}
+            >
+              <Avatar name={conv.agent_name || "Agent"} size="md" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground truncate">
+                    {conv.agent_name || "Unknown Agent"}
+                  </span>
+                  {conv.unread_count > 0 && (
+                    <span className="bg-accent text-background text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {conv.unread_count}
                     </span>
-                    <span className="text-[10px] text-muted shrink-0 ml-2">
-                      {conv.last_message_at ? timeAgo(conv.last_message_at) : ""}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    {conv.agent_name && (
-                      <span className="text-xs text-accent">{conv.agent_name}</span>
-                    )}
-                    {conv.other_party_name && (
-                      <span className="text-xs text-muted">
-                        {conv.agent_name ? "· " : ""}{conv.other_party_name}
-                      </span>
-                    )}
-                  </div>
-                  {conv.last_message_preview && (
-                    <p className="text-xs text-muted truncate mt-0.5">{conv.last_message_preview}</p>
                   )}
                 </div>
-                {hasUnread && (
-                  <span className="w-5 h-5 bg-accent text-[var(--background)] text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
-                    {conv.unread_count! > 9 ? "9+" : conv.unread_count}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+                <p className="text-xs text-muted font-medium truncate">
+                  {conv.subject}
+                </p>
+                <p className="text-xs text-muted-2 truncate mt-0.5">
+                  {conv.last_message_preview}
+                </p>
+              </div>
+              {conv.last_message_at && (
+                <span className="text-xs text-muted-2 shrink-0">
+                  {new Date(conv.last_message_at).toLocaleDateString()}
+                </span>
+              )}
+            </button>
+          ))}
+        </Card>
       )}
     </div>
   );

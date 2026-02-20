@@ -5,117 +5,92 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Bot,
-  ClipboardList,
+  PlusCircle,
   MessageSquare,
-  BarChart3,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  LogOut,
+  FileText,
+  ClipboardList,
+  X,
 } from "lucide-react";
 
-const NAV_ITEMS = [
+const links = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/agents", label: "My Agents", icon: Bot },
   { href: "/dashboard/tasks", label: "Tasks", icon: ClipboardList },
+  { href: "/dashboard/posts", label: "Posts", icon: FileText },
+  { href: "/dashboard/agents/new", label: "Create Agent", icon: PlusCircle },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 interface SidebarProps {
-  collapsed: boolean;
-  onToggle: () => void;
-  onLogout: () => void;
-  unreadMessages?: number;
+  open?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ collapsed, onToggle, onLogout, unreadMessages = 0 }: SidebarProps) {
+export default function Sidebar({ open = true, onClose }: SidebarProps) {
   const pathname = usePathname();
 
-  function isActive(href: string) {
-    if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
-  }
-
   return (
-    <aside
-      className={`fixed top-0 left-0 h-screen bg-[var(--bg-secondary)] border-r border-border flex flex-col z-40 transition-all duration-200 ${
-        collapsed ? "w-16" : "w-60"
-      }`}
-    >
-      {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-border shrink-0">
-        <span className="text-accent font-heading font-black text-lg tracking-tight">
-          {collapsed ? "S" : "SWARM"}
-        </span>
-        {!collapsed && (
-          <span className="text-muted text-xs ml-2 font-mono">CREATOR</span>
-        )}
-      </div>
+    <>
+      {/* Overlay for mobile */}
+      {open && onClose && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Nav */}
-      <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item.href);
-          const Icon = item.icon;
-          const showBadge = item.href === "/dashboard/messages" && unreadMessages > 0;
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative ${
-                active
-                  ? "bg-accent/10 text-accent border-l-2 border-accent"
-                  : "text-muted hover:text-[var(--foreground)] hover:bg-surface"
-              } ${collapsed ? "justify-center px-0" : ""}`}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon className="w-[18px] h-[18px] shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-              {showBadge && (
-                <span className={`bg-accent text-[var(--background)] text-[10px] font-bold rounded-full flex items-center justify-center ${
-                  collapsed ? "absolute -top-0.5 -right-0.5 w-4 h-4" : "ml-auto w-5 h-5"
-                }`}>
-                  {unreadMessages > 9 ? "9+" : unreadMessages}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Bottom */}
-      <div className="border-t border-border p-2 space-y-0.5">
-        <button
-          onClick={onLogout}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted hover:text-destructive hover:bg-destructive/10 transition-colors w-full ${
-            collapsed ? "justify-center px-0" : ""
-          }`}
-          title={collapsed ? "Sign Out" : undefined}
-        >
-          <LogOut className="w-[18px] h-[18px] shrink-0" />
-          {!collapsed && <span>Sign Out</span>}
-        </button>
-
-        <button
-          onClick={onToggle}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted hover:text-[var(--foreground)] hover:bg-surface transition-colors w-full ${
-            collapsed ? "justify-center px-0" : ""
-          }`}
-          title={collapsed ? "Expand" : "Collapse"}
-        >
-          {collapsed ? (
-            <ChevronRight className="w-[18px] h-[18px]" />
-          ) : (
-            <>
-              <ChevronLeft className="w-[18px] h-[18px] shrink-0" />
-              <span>Collapse</span>
-            </>
+      <nav
+        className={`fixed md:sticky top-0 left-0 z-50 md:z-auto w-60 h-screen bg-surface flex flex-col transition-transform duration-200 ${
+          open ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
+        <div className="flex items-center justify-between p-6">
+          <Link href="/">
+            <span className="text-foreground font-display font-bold text-xl tracking-tight">
+              SWARM
+            </span>
+          </Link>
+          {onClose && (
+            <button onClick={onClose} className="md:hidden text-muted hover:text-foreground">
+              <X className="w-5 h-5" />
+            </button>
           )}
-        </button>
-      </div>
-    </aside>
+        </div>
+
+        <div className="flex-1 px-3">
+          <ul className="space-y-1">
+            {links.map((link) => {
+              const active = pathname === link.href;
+              const Icon = link.icon;
+              return (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    onClick={onClose}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
+                      active
+                        ? "bg-accent-soft text-accent font-medium"
+                        : "text-muted hover:text-foreground hover:bg-surface-2"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {link.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="p-4">
+          <Link
+            href="/browse"
+            className="text-xs text-muted-2 hover:text-foreground transition-colors"
+          >
+            Browse Marketplace
+          </Link>
+        </div>
+      </nav>
+    </>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { login } from "@/lib/api";
 import { setToken } from "@/lib/auth";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,7 +15,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
@@ -29,59 +31,54 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center px-4">
+    <div className="flex items-center justify-center min-h-screen bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <Link href="/" className="text-accent font-heading font-black text-2xl tracking-tight">
-            SWARM
+          <Link href="/" className="inline-block">
+            <span className="text-foreground font-display font-bold text-2xl tracking-tight">
+              SWARM
+            </span>
           </Link>
-          <p className="text-muted text-sm mt-2">Sign in to your command center</p>
+          <h2 className="font-heading text-xl font-bold text-foreground mt-4">
+            Welcome back
+          </h2>
+          <p className="text-muted text-sm mt-1">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 space-y-4">
           {error && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm rounded-lg px-4 py-3">
+            <div className="bg-error/10 text-error text-sm px-4 py-2.5 rounded-xl">
               {error}
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-muted mb-1.5">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-[var(--foreground)] placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
-              placeholder="you@example.com"
-            />
-          </div>
+          <Input
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-muted mb-1.5">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-[var(--foreground)] placeholder:text-muted/50 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
-              placeholder="••••••••"
-            />
-          </div>
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            required
+          />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-accent text-[var(--background)] font-semibold rounded-lg px-4 py-2.5 hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Signing in..." : "Sign In"}
-          </button>
+          </Button>
         </form>
 
-        <p className="text-center text-sm text-muted mt-6">
-          Don&apos;t have an account?{" "}
+        <p className="text-sm text-center mt-4 text-muted">
+          No account?{" "}
           <Link href="/signup" className="text-accent hover:text-accent-hover transition-colors">
-            Get Started
+            Create one
           </Link>
         </p>
       </div>

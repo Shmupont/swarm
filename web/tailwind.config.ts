@@ -2,75 +2,63 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: ["./src/**/*.{ts,tsx}"],
-  darkMode: "class",
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        muted: "var(--muted)",
-        accent: {
-          DEFAULT: "var(--accent)",
-          hover: "var(--accent-hover)",
-          muted: "var(--accent-muted)",
-        },
-        surface: {
-          DEFAULT: "var(--surface)",
-          hover: "var(--surface-hover)",
-        },
-        border: {
-          DEFAULT: "var(--border)",
-          hover: "var(--border-hover)",
-        },
-        success: "var(--success)",
-        warning: "var(--warning)",
-        destructive: "var(--destructive)",
-        swarm: {
-          bg: {
-            DEFAULT: "#0A0F13",
-            secondary: "#131A21",
-            tertiary: "#1C252E",
-            elevated: "#243140",
-          },
-          accent: {
-            DEFAULT: "#2DD4BF",
-            hover: "#14B8A6",
-            muted: "#0F766E",
-          },
-          blue: {
-            DEFAULT: "#38BDF8",
-            muted: "#0284C7",
-          },
-          text: {
-            DEFAULT: "#F0F4F8",
-            secondary: "#94A3B8",
-            muted: "#64748B",
-          },
-          border: {
-            DEFAULT: "#1E293B",
-            hover: "#334155",
-          },
-        },
+        /* ── Background Layers (warm dark blue-grey, Safari-inspired) ── */
+        background: "#1C1C1E",
+        surface: "#2C2C2E",
+        "surface-2": "#3A3A3C",
+        "surface-3": "#48484A",
+        elevated: "#48484A",
+        "card-hover": "#333335",
+
+        /* ── Accent — Turquoise ── */
+        accent: "#2DD4BF",
+        "accent-muted": "rgba(45, 212, 191, 0.12)",
+        "accent-hover": "#5EEAD4",
+        "accent-soft": "rgba(45, 212, 191, 0.12)",
+
+        /* ── Text ── */
+        foreground: "#F5F5F7",
+        muted: "#A1A1A6",
+        "muted-2": "#6E6E73",
+
+        /* ── Borders (very subtle, used sparingly) ── */
+        border: "rgba(255, 255, 255, 0.06)",
+        "border-hover": "rgba(255, 255, 255, 0.1)",
+
+        /* ── Semantic ── */
+        success: "#30D158",
+        warning: "#FFD60A",
+        error: "#FF453A",
+        info: "#64D2FF",
+
+        /* keep secondary for compat */
+        secondary: "#38BDF8",
+        "secondary-muted": "rgba(56, 189, 248, 0.12)",
       },
       fontFamily: {
-        heading: ["var(--font-heading)", "system-ui", "sans-serif"],
-        mono: ["var(--font-mono)", "monospace"],
-        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        display: ["Clash Display", "sans-serif"],
-        body: ["General Sans", "sans-serif"],
+        display: ["Clash Display", "system-ui", "sans-serif"],
+        heading: ["Satoshi", "system-ui", "sans-serif"],
+        sans: ["General Sans", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
-      keyframes: {
-        "pulse-glow": {
-          "0%, 100%": { opacity: "1" },
-          "50%": { opacity: "0.5" },
-        },
+      backgroundImage: {
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+        "gradient-accent":
+          "linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%)",
       },
-      animation: {
-        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+      borderRadius: {
+        "squircle": "22%",
+      },
+      boxShadow: {
+        card: "0 2px 12px rgba(0, 0, 0, 0.2)",
+        elevated: "0 4px 24px rgba(0, 0, 0, 0.3)",
       },
     },
   },
-  plugins: [require("@tailwindcss/typography")],
+  plugins: [],
 };
 
 export default config;

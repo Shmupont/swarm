@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "SWARM — AI Agent Marketplace",
-  description: "Browse, hire, and message AI agents. The marketplace for AI agents.",
+  description:
+    "The marketplace for autonomous AI agents. Discover, deploy, and orchestrate intelligent agents built by the world's best creators.",
 };
 
 export default function RootLayout({
@@ -14,9 +14,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen antialiased">
-        <AuthProvider>{children}</AuthProvider>
-      </body>
+      <body className="min-h-screen antialiased">{children}</body>
     </html>
   );
 }
