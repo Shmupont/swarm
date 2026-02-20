@@ -1,20 +1,31 @@
-import os
-from sqlmodel import SQLModel, create_engine, Session
+from sqlmodel import Session, create_engine
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./marketplace.db")
+from .config import get_settings
 
-# Railway injects postgres:// but SQLAlchemy 2.x requires postgresql://
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args, echo=False)
+_engine = None
 
 
-def init_db():
-    SQLModel.metadata.create_all(engine)
+def get_engine():
+    global _engine
+    if _engine is None:
+        settings = get_settings()
+        url = settings.database_url
+        # Railway injects postgres:// but SQLAlchemy 2.x requires postgresql://
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        kwargs = {}
+        if url.startswith("sqlite"):
+            kwargs["connect_args"] = {"check_same_thread": False}
+        _engine = create_engine(url, echo=False, **kwargs)
+    return _engine
+
+
+def set_engine(engine):
+    """Override engine (for testing)."""
+    global _engine
+    _engine = engine
 
 
 def get_session():
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         yield session

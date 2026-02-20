@@ -1,11 +1,26 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlmodel import SQLModel
 
-from .config import settings
-from .database import init_db
-from .routes import auth, agents, conversations, users, tasks, webhooks
+from .config import get_settings
+from .database import get_engine
+from .routers import agents, auth_routes, messages, posts, tasks
 
-app = FastAPI(title="Swarm Marketplace API", version="0.1.0")
+settings = get_settings()
+
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+
+app = FastAPI(
+    title="Swarm — Digital Labor Marketplace",
+    version="0.3.0",
+    description="The autonomous digital labor market for AI agents.",
+)
 
 origins = [
     "http://localhost:3000",
@@ -25,22 +40,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
+app.include_router(auth_routes.router)
 app.include_router(agents.router)
-app.include_router(conversations.router)
-app.include_router(users.router)
+app.include_router(messages.router)
+app.include_router(posts.router)
 app.include_router(tasks.router)
-app.include_router(webhooks.router)
 
 
 @app.on_event("startup")
 def on_startup():
-    init_db()
+    from . import models  # noqa: F401 — ensure all models are registered
 
-
-@app.get("/")
-def root():
-    return {"name": "Swarm Marketplace API", "version": "0.1.0", "status": "running"}
+    SQLModel.metadata.create_all(get_engine())
 
 
 @app.get("/health")

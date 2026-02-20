@@ -1,11 +1,18 @@
-import os
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings
 
 
-class Settings:
-    jwt_secret: str = os.getenv("JWT_SECRET", "dev-jwt-secret-change-in-production")
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./marketplace.db")
-    frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
-    base_url: str = os.getenv("BASE_URL", "http://localhost:8000")
+class Settings(BaseSettings):
+    database_url: str = "sqlite:///marketplace.db"
+    jwt_secret: str = "dev-jwt-secret-change-in-production"
+    log_level: str = "INFO"
+    base_url: str = "http://localhost:8000"
+    frontend_origin: str = "http://localhost:3000"
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

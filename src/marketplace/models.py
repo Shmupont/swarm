@@ -1,166 +1,263 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Optional
-from sqlmodel import SQLModel, Field, Column
-import sqlalchemy as sa
-import json
+from datetime import UTC, datetime
+
+from sqlalchemy import JSON, Column, Text
+from sqlmodel import Field, SQLModel
 
 
-def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+def _utcnow() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
-def new_id() -> str:
-    return str(uuid.uuid4())
+# ── Categories ───────────────────────────────────────────────────────
+
+AGENT_CATEGORIES = [
+    "tax",
+    "legal",
+    "finance",
+    "software-development",
+    "data-analysis",
+    "marketing",
+    "research",
+    "writing",
+    "design",
+    "customer-support",
+    "sales",
+    "hr-recruiting",
+    "operations",
+    "security",
+    "other",
+]
 
 
-# ── JSON helpers for SQLite ─────────────────────────────────────
+# ── User ─────────────────────────────────────────────────────────────
 
-class JSONList(sa.TypeDecorator):
-    impl = sa.Text
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        return json.dumps(value) if value is not None else "[]"
-
-    def process_result_value(self, value, dialect):
-        return json.loads(value) if value else []
-
-
-class JSONDict(sa.TypeDecorator):
-    impl = sa.Text
-    cache_ok = True
-
-    def process_bind_param(self, value, dialect):
-        return json.dumps(value) if value is not None else "{}"
-
-    def process_result_value(self, value, dialect):
-        return json.loads(value) if value else {}
-
-
-# ── User ────────────────────────────────────────────────────────
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     email: str = Field(unique=True, index=True)
     password_hash: str
-    display_name: Optional[str] = None
-    avatar_url: Optional[str] = None
-    created_at: datetime = Field(default_factory=utcnow)
+    display_name: str | None = None
+    avatar_url: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
-# ── Agent Profile ───────────────────────────────────────────────
+# ── Agent Profile ────────────────────────────────────────────────────
+
 
 class AgentProfile(SQLModel, table=True):
     __tablename__ = "agent_profiles"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
-    owner_id: str = Field(foreign_key="users.id", index=True)
-    name: str
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+
+    # Identity
+    name: str = Field(index=True)
     slug: str = Field(unique=True, index=True)
-    tagline: Optional[str] = None
-    description: str = ""
-    avatar_url: Optional[str] = None
-    category: str = "other"
-    tags: list = Field(default=[], sa_column=Column(JSONList))
-    capabilities: list = Field(default=[], sa_column=Column(JSONList))
-    pricing_model: Optional[str] = None
-    pricing_details: dict = Field(default={}, sa_column=Column(JSONDict))
-    demo_url: Optional[str] = None
-    source_url: Optional[str] = None
-    api_endpoint: Optional[str] = None
-    portfolio: list = Field(default=[], sa_column=Column(JSONList))
-    total_hires: int = 0
-    avg_rating: Optional[float] = None
-    response_time_hours: Optional[float] = None
-    tasks_completed: int = 0
-    total_earned_cents: int = 0
-    is_docked: bool = True
-    is_featured: bool = False
-    dock_date: datetime = Field(default_factory=utcnow)
-    status: str = "active"
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
-    # Webhook / Docking
-    webhook_url: Optional[str] = None
-    webhook_secret: Optional[str] = None
-    webhook_status: str = "unconfigured"
-    webhook_last_ping: Optional[datetime] = None
-    max_concurrent_tasks: int = 5
-    auto_accept_tasks: bool = False
-    accepted_task_types: list = Field(default=[], sa_column=Column(JSONList))
+    tagline: str | None = None
+    description: str = Field(
+        default="", sa_column=Column("description", Text, nullable=False, server_default="")
+    )
+    avatar_url: str | None = None
+
+    # Classification
+    category: str = Field(index=True)
+    tags: list = Field(
+        default_factory=list,
+        sa_column=Column("tags", JSON, nullable=False, server_default="[]"),
+    )
+    capabilities: list = Field(
+        default_factory=list,
+        sa_column=Column("capabilities", JSON, nullable=False, server_default="[]"),
+    )
+
+    # Pricing
+    pricing_model: str | None = None
+    pricing_details: dict = Field(
+        default_factory=dict,
+        sa_column=Column("pricing_details", JSON, nullable=False, server_default="{}"),
+    )
+
+    # Links
+    demo_url: str | None = None
+    source_url: str | None = None
+    api_endpoint: str | None = None
+
+    # Portfolio
+    portfolio: list = Field(
+        default_factory=list,
+        sa_column=Column("portfolio", JSON, nullable=False, server_default="[]"),
+    )
+
+    # Stats
+    total_hires: int = Field(default=0)
+    avg_rating: float | None = None
+    response_time_hours: float | None = None
+    tasks_completed: int = Field(default=0)
+    total_earned_cents: int = Field(default=0)
+
+    # Status — "docked" is the key concept
+    is_docked: bool = Field(default=True)
+    is_featured: bool = Field(default=False)
+    dock_date: datetime = Field(default_factory=_utcnow)
+    status: str = Field(default="active")  # active, idle, paused
+
+    # Docking / Webhook Configuration
+    webhook_url: str | None = None
+    webhook_secret_hash: str | None = None
+    webhook_secret_prefix: str | None = None
+    webhook_status: str = Field(default="unconfigured")  # unconfigured, connected, failed
+    webhook_last_ping: datetime | None = None
+    max_concurrent_tasks: int = Field(default=5)
+    auto_accept_tasks: bool = Field(default=False)
+    accepted_task_types: list = Field(
+        default_factory=list,
+        sa_column=Column("accepted_task_types", JSON, nullable=False, server_default="[]"),
+    )
+    active_task_count: int = Field(default=0)
+
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
-# ── Conversation ────────────────────────────────────────────────
+# ── Conversation ─────────────────────────────────────────────────────
+
 
 class Conversation(SQLModel, table=True):
     __tablename__ = "conversations"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
-    agent_profile_id: str = Field(foreign_key="agent_profiles.id", index=True)
-    initiator_id: str = Field(foreign_key="users.id", index=True)
-    owner_id: str = Field(foreign_key="users.id", index=True)
-    subject: Optional[str] = None
-    last_message_at: Optional[datetime] = None
-    is_read_by_owner: bool = False
-    is_read_by_initiator: bool = True
-    created_at: datetime = Field(default_factory=utcnow)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    initiator_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    subject: str | None = None
+    last_message_at: datetime = Field(default_factory=_utcnow)
+    is_read_by_owner: bool = Field(default=False)
+    is_read_by_initiator: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
-# ── Message ─────────────────────────────────────────────────────
+# ── Message ──────────────────────────────────────────────────────────
+
 
 class Message(SQLModel, table=True):
     __tablename__ = "messages"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
-    conversation_id: str = Field(foreign_key="conversations.id", index=True)
-    sender_id: str = Field(foreign_key="users.id")
-    content: str
-    is_read: bool = False
-    created_at: datetime = Field(default_factory=utcnow)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    conversation_id: uuid.UUID = Field(foreign_key="conversations.id", index=True)
+    sender_id: uuid.UUID = Field(foreign_key="users.id")
+    content: str = Field(sa_column=Column("content", Text, nullable=False))
+    is_read: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
-# ── Task ────────────────────────────────────────────────────────
+# ── Agent Post (tweet-like content) ──────────────────────────
+
+
+# ── Task ────────────────────────────────────────────────────────────
+
 
 class Task(SQLModel, table=True):
     __tablename__ = "tasks"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
-    buyer_id: str = Field(foreign_key="users.id", index=True)
-    agent_profile_id: Optional[str] = Field(default=None, foreign_key="agent_profiles.id", index=True)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    # Who posted it
+    buyer_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+
+    # Who's doing it (nullable until assigned)
+    agent_profile_id: uuid.UUID | None = Field(
+        default=None, foreign_key="agent_profiles.id", index=True
+    )
+
+    # Task definition
     title: str
-    description: str = ""
-    category: str = "other"
-    inputs_json: dict = Field(default={}, sa_column=Column(JSONDict))
-    constraints_json: dict = Field(default={}, sa_column=Column(JSONDict))
-    budget_cents: int = 0
-    currency: str = "USD"
-    deadline: Optional[datetime] = None
-    status: str = "posted"  # posted, assigned, dispatched, accepted, in_progress, completed, failed, expired, dispatch_failed
-    dispatched_at: Optional[datetime] = None
-    accepted_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    failed_at: Optional[datetime] = None
-    result_json: Optional[dict] = Field(default=None, sa_column=Column(JSONDict))
-    result_summary: Optional[str] = None
-    execution_time_seconds: Optional[float] = None
-    confidence_score: Optional[float] = None
-    error_message: Optional[str] = None
-    buyer_accepted: Optional[bool] = None
-    buyer_feedback: Optional[str] = None
-    created_at: datetime = Field(default_factory=utcnow)
-    updated_at: datetime = Field(default_factory=utcnow)
+    description: str = Field(sa_column=Column("description", Text, nullable=False))
+    category: str = Field(index=True)
+    inputs_json: dict = Field(
+        default_factory=dict,
+        sa_column=Column("inputs_json", JSON, nullable=False, server_default="{}"),
+    )
+    constraints_json: dict = Field(
+        default_factory=dict,
+        sa_column=Column("constraints_json", JSON, nullable=False, server_default="{}"),
+    )
+
+    # Budget
+    budget_cents: int
+    currency: str = Field(default="USD")
+    deadline: datetime
+
+    # Status lifecycle: posted → assigned → dispatched → accepted → in_progress → completed/failed/expired
+    status: str = Field(default="posted", index=True)
+
+    # Dispatch tracking
+    dispatched_at: datetime | None = None
+    accepted_at: datetime | None = None
+    completed_at: datetime | None = None
+    failed_at: datetime | None = None
+
+    # Result (populated when agent reports back)
+    result_json: dict | None = Field(
+        default=None,
+        sa_column=Column("result_json", JSON, nullable=True),
+    )
+    result_summary: str | None = None
+    execution_time_seconds: int | None = None
+    confidence_score: float | None = None
+    error_message: str | None = Field(
+        default=None, sa_column=Column("error_message", Text, nullable=True)
+    )
+
+    # Buyer review
+    buyer_accepted: bool | None = None
+    buyer_feedback: str | None = None
+
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
-# ── Task Event ──────────────────────────────────────────────────
+# ── Task Event (Audit Log) ─────────────────────────────────────────
+
 
 class TaskEvent(SQLModel, table=True):
     __tablename__ = "task_events"
 
-    id: str = Field(default_factory=new_id, primary_key=True)
-    task_id: str = Field(foreign_key="tasks.id", index=True)
-    event_type: str
-    event_data: dict = Field(default={}, sa_column=Column(JSONDict))
-    created_at: datetime = Field(default_factory=utcnow)
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    task_id: uuid.UUID = Field(foreign_key="tasks.id", index=True)
+    event_type: str  # posted, assigned, dispatched, accepted, rejected, completed, failed, expired, buyer_accepted, buyer_rejected
+    event_data: dict = Field(
+        default_factory=dict,
+        sa_column=Column("event_data", JSON, nullable=False, server_default="{}"),
+    )
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Agent Post (tweet-like content) ──────────────────────────
+
+
+class AgentPost(SQLModel, table=True):
+    __tablename__ = "agent_posts"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    author_user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+
+    content: str = Field(sa_column=Column("content", Text, nullable=False))
+    tags: list = Field(
+        default_factory=list,
+        sa_column=Column("tags", JSON, nullable=False, server_default="[]"),
+    )
+    link_url: str | None = None
+
+    star_count: int = Field(default=0)
+    repost_count: int = Field(default=0)
+    comment_count: int = Field(default=0)
+
+    is_published: bool = Field(default=True)
+    is_pinned: bool = Field(default=False)
+
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)

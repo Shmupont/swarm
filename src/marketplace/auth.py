@@ -1,69 +1,86 @@
-import os
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+import uuid
+from datetime import UTC, datetime, timedelta
 
 import jwt
-import bcrypt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from argon2 import PasswordHasher
+from fastapi import Depends, HTTPException, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel import Session, select
 
+from .config import get_settings
 from .database import get_session
 from .models import User
 
-JWT_SECRET = os.getenv("JWT_SECRET", "dev-jwt-secret-change-in-production")
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ph = PasswordHasher()
+security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
 
-security = HTTPBearer(auto_error=False)
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION = timedelta(hours=24)
+
+
+# ── Password helpers ─────────────────────────────────────────────────
 
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return ph.hash(password)
 
 
-def verify_password(password: str, hashed: str) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed.encode())
-
-
-def create_access_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": user_id, "exp": expire}, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-
-def decode_token(token: str) -> Optional[str]:
+def verify_password(password: str, password_hash: str) -> bool:
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload.get("sub")
-    except jwt.PyJWTError:
-        return None
+        return ph.verify(password_hash, password)
+    except Exception:
+        return False
+
+
+# ── JWT helpers ──────────────────────────────────────────────────────
+
+
+def create_jwt(user_id: str, email: str) -> str:
+    settings = get_settings()
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "exp": datetime.now(UTC) + JWT_EXPIRATION,
+    }
+    return jwt.encode(payload, settings.jwt_secret, algorithm=JWT_ALGORITHM)
+
+
+def decode_jwt(token: str) -> dict:
+    settings = get_settings()
+    return jwt.decode(token, settings.jwt_secret, algorithms=[JWT_ALGORITHM])
+
+
+# ── FastAPI dependencies ─────────────────────────────────────────────
 
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials = Security(security),
     session: Session = Depends(get_session),
 ) -> User:
-    if not credentials:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    user_id = decode_token(credentials.credentials)
-    if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
-    user = session.get(User, user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-
-    return user
+    """Authenticate via JWT (Bearer eyJ...)."""
+    token = credentials.credentials
+    try:
+        payload = decode_jwt(token)
+        user = session.get(User, uuid.UUID(payload["sub"]))
+        if not user:
+            raise HTTPException(401, "User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(401, "Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(401, "Invalid token")
 
 
 def get_optional_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Security(optional_security),
     session: Session = Depends(get_session),
-) -> Optional[User]:
+) -> User | None:
+    """Returns User if valid JWT provided, None otherwise."""
     if not credentials:
         return None
-    user_id = decode_token(credentials.credentials)
-    if not user_id:
+    try:
+        payload = decode_jwt(credentials.credentials)
+        return session.get(User, uuid.UUID(payload["sub"]))
+    except Exception:
         return None
-    return session.get(User, user_id)
