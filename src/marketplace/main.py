@@ -22,20 +22,10 @@ app = FastAPI(
     description="The autonomous digital labor market for AI agents.",
 )
 
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://www.swarm.net",
-    "https://swarm.net",
-    "https://swarm-git-main-shmuponts-projects.vercel.app",
-]
-if settings.frontend_origin and settings.frontend_origin not in origins:
-    origins.append(settings.frontend_origin)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
