@@ -3,8 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getToken } from "@/lib/auth";
-import { listMyAgents, updateAgentProfile } from "@/lib/api";
-import type { AgentProfile } from "@/lib/api";
+import {
+  listMyAgents,
+  updateAgentProfile,
+  configureAgentBrain,
+  setAgentApiKey,
+  deleteAgentApiKey,
+  getAgentBrainStatus,
+} from "@/lib/api";
+import type { AgentProfile, BrainStatus } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -52,6 +59,17 @@ export default function EditAgentPage() {
   const [apiEndpoint, setApiEndpoint] = useState("");
   const [isDocked, setIsDocked] = useState(true);
 
+  // Brain config
+  const [brainStatus, setBrainStatus] = useState<BrainStatus | null>(null);
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [llmModel, setLlmModel] = useState("claude-sonnet-4-20250514");
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(1024);
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [brainSaving, setBrainSaving] = useState(false);
+  const [keySaving, setKeySaving] = useState(false);
+  const [brainMessage, setBrainMessage] = useState("");
+
   useEffect(() => {
     const token = getToken();
     if (!token) return;
@@ -83,6 +101,18 @@ export default function EditAgentPage() {
       })
       .catch(() => setError("Failed to load agent"))
       .finally(() => setLoading(false));
+
+    // Load brain status
+    getAgentBrainStatus(token, id)
+      .then((status) => {
+        setBrainStatus(status);
+        if (status.has_system_prompt) {
+          setLlmModel(status.llm_model);
+          setTemperature(status.temperature);
+          setMaxTokens(status.max_tokens);
+        }
+      })
+      .catch(() => {});
   }, [id]);
 
   async function handleSubmit(e: FormEvent) {
@@ -224,6 +254,171 @@ export default function EditAgentPage() {
           </Button>
         </div>
       </form>
+
+      {/* Agent Brain Config — outside main form */}
+      <div className="mt-8 space-y-6">
+        <h2 className="font-heading text-xl font-bold text-foreground">
+          Agent Brain (Chat Configuration)
+        </h2>
+
+        {brainStatus && (
+          <div className="flex items-center gap-3 text-sm">
+            <div className={`w-2.5 h-2.5 rounded-full ${brainStatus.is_chat_ready ? "bg-accent" : "bg-muted-2"}`} />
+            <span className="text-muted">
+              {brainStatus.is_chat_ready
+                ? "Chat is live — users can talk to this agent"
+                : "Chat not ready — configure system prompt and API key below"}
+            </span>
+          </div>
+        )}
+
+        <Card className="p-6 space-y-4">
+          <h3 className="font-heading font-bold text-foreground">System Prompt</h3>
+          <p className="text-sm text-muted">
+            Define your agent&apos;s personality and behavior. This is the instruction set that powers every conversation.
+          </p>
+          <textarea
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            rows={8}
+            placeholder="You are a helpful tax advisor agent. You specialize in..."
+            className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y text-sm"
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-muted mb-1.5">Model</label>
+              <select
+                value={llmModel}
+                onChange={(e) => setLlmModel(e.target.value)}
+                className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent/30"
+              >
+                <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+              </select>
+            </div>
+            <Input
+              label="Temperature"
+              type="number"
+              min={0}
+              max={1}
+              step={0.1}
+              value={temperature}
+              onChange={(e) => setTemperature(parseFloat(e.target.value) || 0.7)}
+            />
+            <Input
+              label="Max Tokens"
+              type="number"
+              min={100}
+              max={4096}
+              step={100}
+              value={maxTokens}
+              onChange={(e) => setMaxTokens(parseInt(e.target.value) || 1024)}
+            />
+          </div>
+
+          <Button
+            type="button"
+            disabled={brainSaving || !systemPrompt.trim()}
+            onClick={async () => {
+              const token = getToken();
+              if (!token) return;
+              setBrainSaving(true);
+              setBrainMessage("");
+              try {
+                await configureAgentBrain(token, id, {
+                  system_prompt: systemPrompt,
+                  llm_model: llmModel,
+                  temperature,
+                  max_tokens: maxTokens,
+                });
+                setBrainMessage("Brain config saved!");
+                const status = await getAgentBrainStatus(token, id);
+                setBrainStatus(status);
+              } catch (err) {
+                setBrainMessage(err instanceof Error ? err.message : "Failed to save");
+              } finally {
+                setBrainSaving(false);
+              }
+            }}
+          >
+            {brainSaving ? "Saving..." : "Save Brain Config"}
+          </Button>
+        </Card>
+
+        <Card className="p-6 space-y-4">
+          <h3 className="font-heading font-bold text-foreground">API Key</h3>
+          <p className="text-sm text-muted">
+            Your Anthropic API key is encrypted at rest and only used when users chat with this agent.
+          </p>
+          {brainStatus?.has_api_key && (
+            <div className="flex items-center gap-2 text-sm">
+              <div className="w-2 h-2 rounded-full bg-accent" />
+              <span className="text-muted">Key configured: <code className="font-mono text-foreground">{brainStatus.api_key_preview}</code></span>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Input
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder="sk-ant-..."
+              className="font-mono text-sm"
+            />
+            <Button
+              type="button"
+              disabled={keySaving || !apiKeyInput.trim()}
+              onClick={async () => {
+                const token = getToken();
+                if (!token) return;
+                setKeySaving(true);
+                setBrainMessage("");
+                try {
+                  const result = await setAgentApiKey(token, id, apiKeyInput);
+                  setApiKeyInput("");
+                  setBrainMessage("API key saved!");
+                  const status = await getAgentBrainStatus(token, id);
+                  setBrainStatus(status);
+                } catch (err) {
+                  setBrainMessage(err instanceof Error ? err.message : "Failed to save key");
+                } finally {
+                  setKeySaving(false);
+                }
+              }}
+              className="shrink-0"
+            >
+              {keySaving ? "Saving..." : "Save Key"}
+            </Button>
+          </div>
+          {brainStatus?.has_api_key && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                const token = getToken();
+                if (!token) return;
+                try {
+                  await deleteAgentApiKey(token, id);
+                  setBrainMessage("API key removed");
+                  const status = await getAgentBrainStatus(token, id);
+                  setBrainStatus(status);
+                } catch (err) {
+                  setBrainMessage(err instanceof Error ? err.message : "Failed");
+                }
+              }}
+              className="text-error"
+            >
+              Remove API Key
+            </Button>
+          )}
+        </Card>
+
+        {brainMessage && (
+          <div className="bg-accent-muted text-accent text-sm px-4 py-3 rounded-xl">
+            {brainMessage}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

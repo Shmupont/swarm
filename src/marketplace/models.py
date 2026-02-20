@@ -104,6 +104,26 @@ class AgentProfile(SQLModel, table=True):
     dock_date: datetime = Field(default_factory=_utcnow)
     status: str = Field(default="active")  # active, idle, paused
 
+    # Agent Brain (LLM Configuration)
+    system_prompt: str | None = Field(
+        default=None, sa_column=Column("system_prompt", Text, nullable=True)
+    )
+    llm_model: str = Field(default="claude-sonnet-4-20250514")
+    temperature: float = Field(default=0.7)
+    max_tokens: int = Field(default=1024)
+
+    # Creator's API Key (encrypted)
+    encrypted_api_key: str | None = Field(
+        default=None, sa_column=Column("encrypted_api_key", Text, nullable=True)
+    )
+    api_key_preview: str | None = None
+    has_api_key: bool = Field(default=False)
+
+    # Chat Pricing
+    price_per_conversation_cents: int | None = None
+    price_per_message_cents: int | None = None
+    is_free: bool = Field(default=True)
+
     # Docking / Webhook Configuration
     webhook_url: str | None = None
     webhook_secret_hash: str | None = None
@@ -232,6 +252,38 @@ class TaskEvent(SQLModel, table=True):
         default_factory=dict,
         sa_column=Column("event_data", JSON, nullable=False, server_default="{}"),
     )
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Agent Post (tweet-like content) ──────────────────────────
+
+
+# ── Agent Chat Session ──────────────────────────────────────
+
+
+class AgentSession(SQLModel, table=True):
+    __tablename__ = "agent_sessions"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    title: str | None = None
+    is_active: bool = Field(default=True)
+    total_messages: int = Field(default=0)
+    total_tokens_used: int = Field(default=0)
+    created_at: datetime = Field(default_factory=_utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
+
+
+class AgentChatMessage(SQLModel, table=True):
+    __tablename__ = "agent_chat_messages"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    session_id: uuid.UUID = Field(foreign_key="agent_sessions.id", index=True)
+    role: str  # "user" or "assistant"
+    content: str = Field(sa_column=Column("content", Text, nullable=False))
+    tokens_used: int = Field(default=0)
+    model_used: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 

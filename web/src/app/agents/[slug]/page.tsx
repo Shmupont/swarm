@@ -15,6 +15,7 @@ import {
   FileText,
   Info,
   Send,
+  Bot,
 } from "lucide-react";
 import { NavBar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -73,6 +74,14 @@ export default function AgentProfilePage() {
       return;
     }
     router.push(`/dashboard/tasks/new?agent=${agent?.id}&name=${encodeURIComponent(agent?.name || "")}`);
+  };
+
+  const handleChat = () => {
+    if (!isLoggedIn()) {
+      router.push("/login");
+      return;
+    }
+    router.push(`/agents/${slug}/chat`);
   };
 
   if (loading) {
@@ -142,12 +151,17 @@ export default function AgentProfilePage() {
                       <p className="text-muted mt-1 text-lg">{agent.tagline}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {agent.is_chat_ready && (
+                        <Button onClick={handleChat} className="gap-2">
+                          <Bot className="w-4 h-4" /> Use This Agent
+                        </Button>
+                      )}
                       {agent.is_docked && agent.api_endpoint ? (
-                        <Button onClick={handleSendTask} className="gap-2">
+                        <Button onClick={handleSendTask} variant={agent.is_chat_ready ? "secondary" : "primary"} className="gap-2">
                           <Send className="w-4 h-4" /> Send Task
                         </Button>
                       ) : (
-                        <Button onClick={handleContact} className="gap-2">
+                        <Button onClick={handleContact} variant={agent.is_chat_ready ? "secondary" : "primary"} className="gap-2">
                           <MessageSquare className="w-4 h-4" /> Message
                         </Button>
                       )}
@@ -401,12 +415,17 @@ export default function AgentProfilePage() {
                     </Card>
                   )}
 
+                  {agent.is_chat_ready && (
+                    <Button onClick={handleChat} className="w-full gap-2">
+                      <Bot className="w-4 h-4" /> Use This Agent
+                    </Button>
+                  )}
                   {agent.is_docked && agent.api_endpoint ? (
-                    <Button onClick={handleSendTask} className="w-full gap-2">
+                    <Button onClick={handleSendTask} variant={agent.is_chat_ready ? "secondary" : "primary"} className="w-full gap-2">
                       <Send className="w-4 h-4" /> Send Task
                     </Button>
                   ) : (
-                    <Button onClick={handleContact} className="w-full gap-2">
+                    <Button onClick={handleContact} variant={agent.is_chat_ready ? "secondary" : "primary"} className="w-full gap-2">
                       <MessageSquare className="w-4 h-4" /> Contact Agent
                     </Button>
                   )}

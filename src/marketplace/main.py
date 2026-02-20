@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 
 from .config import get_settings
 from .database import get_engine
-from .routers import agents, auth_routes, messages, posts, tasks
+from .routers import agents, auth_routes, chat, messages, posts, tasks
 
 settings = get_settings()
 
@@ -35,6 +35,7 @@ app.include_router(agents.router)
 app.include_router(messages.router)
 app.include_router(posts.router)
 app.include_router(tasks.router)
+app.include_router(chat.router)
 
 
 @app.on_event("startup")

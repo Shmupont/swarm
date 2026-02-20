@@ -12,10 +12,15 @@ from ..schemas import (
     AgentCreateRequest,
     AgentResponse,
     AgentUpdateRequest,
+    AgentBrainConfigRequest,
+    AgentApiKeyRequest,
+    AgentPricingRequest,
     DashboardStatsResponse,
     WebhookConfigRequest,
     WebhookConfigResponse,
 )
+from ..encryption import encrypt_api_key, mask_api_key
+from ..llm import validate_api_key
 from ..slug import ensure_unique_slug, generate_slug
 from ..webhook import generate_webhook_secret, ping_webhook
 
@@ -26,6 +31,10 @@ def _enrich(profile: AgentProfile, session: Session) -> AgentResponse:
     resp = AgentResponse.model_validate(profile)
     owner = session.get(User, profile.owner_id)
     resp.owner_display_name = (owner.display_name or owner.email) if owner else None
+    resp.is_chat_ready = bool(profile.system_prompt and profile.has_api_key)
+    resp.is_free = profile.is_free
+    resp.price_per_conversation_cents = profile.price_per_conversation_cents
+    resp.price_per_message_cents = profile.price_per_message_cents
     return resp
 
 
@@ -231,6 +240,125 @@ def delete_agent_profile(
     profile.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(profile)
     session.commit()
+
+
+# ── Agent Brain Config (JWT, owner) ────────────────────────────────
+
+
+@router.post("/agents/{id}/brain")
+def configure_agent_brain(
+    id: uuid.UUID,
+    data: AgentBrainConfigRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    agent.system_prompt = data.system_prompt
+    agent.llm_model = data.llm_model
+    agent.temperature = data.temperature
+    agent.max_tokens = data.max_tokens
+    agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    session.add(agent)
+    session.commit()
+    session.refresh(agent)
+    return {"status": "ok", "model": agent.llm_model}
+
+
+@router.post("/agents/{id}/api-key")
+def set_agent_api_key(
+    id: uuid.UUID,
+    data: AgentApiKeyRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    if not data.api_key.startswith("sk-ant-"):
+        raise HTTPException(400, "Invalid Anthropic API key format. Must start with sk-ant-")
+
+    is_valid = validate_api_key(data.api_key)
+    if not is_valid:
+        raise HTTPException(400, "API key is invalid. Please check and try again.")
+
+    agent.encrypted_api_key = encrypt_api_key(data.api_key)
+    agent.api_key_preview = mask_api_key(data.api_key)
+    agent.has_api_key = True
+    agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+    session.add(agent)
+    session.commit()
+    return {"status": "ok", "preview": agent.api_key_preview}
+
+
+@router.delete("/agents/{id}/api-key")
+def remove_agent_api_key(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    agent.encrypted_api_key = None
+    agent.api_key_preview = None
+    agent.has_api_key = False
+    agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    session.add(agent)
+    session.commit()
+    return {"status": "ok"}
+
+
+@router.post("/agents/{id}/pricing")
+def set_agent_pricing(
+    id: uuid.UUID,
+    data: AgentPricingRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    agent.price_per_conversation_cents = data.price_per_conversation_cents
+    agent.price_per_message_cents = data.price_per_message_cents
+    agent.is_free = data.is_free
+    agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    session.add(agent)
+    session.commit()
+    return {"status": "ok"}
+
+
+@router.get("/agents/{id}/brain-status")
+def get_brain_status(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    return {
+        "has_system_prompt": bool(agent.system_prompt),
+        "has_api_key": agent.has_api_key,
+        "api_key_preview": agent.api_key_preview,
+        "model": agent.llm_model,
+        "temperature": agent.temperature,
+        "max_tokens": agent.max_tokens,
+        "is_chat_ready": bool(agent.system_prompt and agent.has_api_key),
+        "pricing": {
+            "is_free": agent.is_free,
+            "per_conversation_cents": agent.price_per_conversation_cents,
+            "per_message_cents": agent.price_per_message_cents,
+        },
+    }
 
 
 # ── Webhook Config (JWT, owner) ────────────────────────────────────

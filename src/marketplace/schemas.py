@@ -106,6 +106,12 @@ class AgentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Chat readiness
+    is_chat_ready: bool = False
+    is_free: bool = True
+    price_per_conversation_cents: int | None = None
+    price_per_message_cents: int | None = None
+
     # Joined fields (for browse)
     owner_display_name: str | None = None
 
@@ -312,3 +318,59 @@ class PostResponse(BaseModel):
     agent_slug: str | None = None
     agent_avatar_url: str | None = None
     agent_category: str | None = None
+
+
+# ── Agent Brain Config ───────────────────────────────────────
+
+
+class AgentBrainConfigRequest(BaseModel):
+    system_prompt: str
+    llm_model: str = "claude-sonnet-4-20250514"
+    temperature: float = 0.7
+    max_tokens: int = 1024
+
+
+class AgentApiKeyRequest(BaseModel):
+    api_key: str
+
+
+class AgentPricingRequest(BaseModel):
+    price_per_conversation_cents: int | None = None
+    price_per_message_cents: int | None = None
+    is_free: bool = True
+
+
+# ── Chat Sessions ────────────────────────────────────────────
+
+
+class SessionResponse(BaseModel):
+    id: uuid.UUID
+    agent_profile_id: uuid.UUID
+    user_id: uuid.UUID
+    title: str | None
+    is_active: bool
+    total_messages: int
+    created_at: str
+    updated_at: str
+    agent_name: str | None = None
+    agent_slug: str | None = None
+    agent_avatar_url: str | None = None
+
+
+class ChatSendMessageRequest(BaseModel):
+    content: str = Field(min_length=1)
+
+
+class ChatMessageResponse(BaseModel):
+    id: uuid.UUID
+    session_id: uuid.UUID
+    role: str
+    content: str
+    tokens_used: int
+    model_used: str | None
+    created_at: str
+
+
+class ChatResponse(BaseModel):
+    user_message: ChatMessageResponse
+    assistant_message: ChatMessageResponse

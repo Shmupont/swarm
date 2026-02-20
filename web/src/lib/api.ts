@@ -75,6 +75,52 @@ export interface AgentProfile {
   created_at: string;
   updated_at: string;
   owner_display_name: string | null;
+  // Chat readiness
+  is_chat_ready: boolean;
+  is_free: boolean;
+  price_per_conversation_cents: number | null;
+  price_per_message_cents: number | null;
+}
+
+// ── Chat Sessions ─────────────────────────────────────────────
+
+export interface ChatSession {
+  id: string;
+  agent_profile_id: string;
+  user_id: string;
+  title: string | null;
+  is_active: boolean;
+  total_messages: number;
+  created_at: string;
+  updated_at: string;
+  agent_name: string | null;
+  agent_slug: string | null;
+  agent_avatar_url: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  tokens_used: number;
+  model_used: string | null;
+  created_at: string;
+}
+
+export interface ChatResponse {
+  user_message: ChatMessage;
+  assistant_message: ChatMessage;
+}
+
+export interface BrainStatus {
+  has_system_prompt: boolean;
+  has_api_key: boolean;
+  api_key_preview: string | null;
+  llm_model: string;
+  temperature: number;
+  max_tokens: number;
+  is_chat_ready: boolean;
 }
 
 export interface Conversation {
@@ -505,4 +551,77 @@ export async function rejectTaskResult(token: string, taskId: string) {
     method: "POST",
     token,
   });
+}
+
+// ── Agent Brain Config ────────────────────────────────────────
+
+export async function configureAgentBrain(
+  token: string,
+  agentId: string,
+  data: { system_prompt: string; llm_model?: string; temperature?: number; max_tokens?: number }
+) {
+  return apiFetch<AgentProfile>(`/agents/${agentId}/brain`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    token,
+  });
+}
+
+export async function setAgentApiKey(token: string, agentId: string, api_key: string) {
+  return apiFetch<{ message: string; api_key_preview: string }>(
+    `/agents/${agentId}/api-key`,
+    {
+      method: "POST",
+      body: JSON.stringify({ api_key }),
+      token,
+    }
+  );
+}
+
+export async function deleteAgentApiKey(token: string, agentId: string) {
+  return apiFetch(`/agents/${agentId}/api-key`, { method: "DELETE", token });
+}
+
+export async function configureAgentPricing(
+  token: string,
+  agentId: string,
+  data: { is_free?: boolean; price_per_conversation_cents?: number; price_per_message_cents?: number }
+) {
+  return apiFetch<AgentProfile>(`/agents/${agentId}/pricing`, {
+    method: "POST",
+    body: JSON.stringify(data),
+    token,
+  });
+}
+
+export async function getAgentBrainStatus(token: string, agentId: string) {
+  return apiFetch<BrainStatus>(`/agents/${agentId}/brain-status`, { token });
+}
+
+// ── Chat ──────────────────────────────────────────────────────
+
+export async function startChatSession(token: string, slug: string) {
+  return apiFetch<ChatSession>(`/agents/${slug}/sessions`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function sendChatMessage(token: string, sessionId: string, content: string) {
+  return apiFetch<ChatResponse>(`/sessions/${sessionId}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+    token,
+  });
+}
+
+export async function getChatSession(token: string, sessionId: string) {
+  return apiFetch<{ session: ChatSession; messages: ChatMessage[] }>(
+    `/sessions/${sessionId}`,
+    { token }
+  );
+}
+
+export async function listChatSessions(token: string) {
+  return apiFetch<ChatSession[]>("/sessions", { token });
 }
