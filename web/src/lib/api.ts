@@ -17,7 +17,15 @@ async function apiFetch<T = unknown>(
   const res = await fetch(`${API_URL}${path}`, { headers, ...rest });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.detail || `API error ${res.status}`);
+    let message = `API error ${res.status}`;
+    if (typeof body.detail === "string") {
+      message = body.detail;
+    } else if (Array.isArray(body.detail)) {
+      message = body.detail.map((e: { msg?: string }) => e.msg || String(e)).join(", ");
+    } else if (body.message) {
+      message = body.message;
+    }
+    throw new Error(message);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
