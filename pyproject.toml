@@ -1,0 +1,21 @@
+[project]
+name = "swarm-marketplace"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "sqlmodel>=0.0.22",
+    "aiosqlite>=0.20.0",
+    "psycopg2-binary>=2.9.9",
+    "pyjwt>=2.9.0",
+    "bcrypt>=4.2.0",
+    "python-multipart>=0.0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.28",
+]
