@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: swarm
+      POSTGRES_PASSWORD: swarm
+      POSTGRES_DB: swarm
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  api:
+    build: .
+    command: uvicorn src.marketplace.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://swarm:swarm@db:5432/swarm
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: dev-jwt-secret-change-in-production
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+
+  web:
+    build: ./web
+    command: npm run dev
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    depends_on:
+      - api
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:

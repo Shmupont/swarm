@@ -1,0 +1,114 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@600,700&f[]=satoshi@700,900&f[]=general-sans@400,500,600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-page: #1C1C1E;
+  --bg-card: #2C2C2E;
+  --bg-card-inner: #3A3A3C;
+  --bg-elevated: #48484A;
+  --bg-input: #3A3A3C;
+  --accent: #2DD4BF;
+  --accent-hover: #5EEAD4;
+  --accent-muted: #0F766E;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --text-primary: #F5F5F7;
+  --text-secondary: #A1A1A6;
+  --text-muted: #6E6E73;
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.2);
+  --shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+body {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
+  font-family: "General Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(45, 212, 191, 0.3);
+  color: #F5F5F7;
+}
+
+/* Focus ring (accessibility) */
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.4);
+  border-radius: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #636366;
+}
+
+/* Glass utility */
+.glass {
+  background: rgba(28, 28, 30, 0.85);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Squircle avatar */
+.avatar-squircle {
+  border-radius: 22%;
+  object-fit: cover;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 2s linear infinite;
+}
+
+/* Subtle divider (use sparingly instead of borders) */
+.section-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+}
