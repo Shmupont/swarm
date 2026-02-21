@@ -53,6 +53,19 @@ def on_startup():
     existing_cols = {c["name"] for c in inspector.get_columns("agent_profiles")}
 
     new_cols = {
+        # Agent Brain columns
+        "system_prompt": "TEXT",
+        "llm_model": "VARCHAR DEFAULT 'claude-sonnet-4-20250514'",
+        "temperature": "FLOAT DEFAULT 0.7",
+        "max_tokens": "INTEGER DEFAULT 1024",
+        "encrypted_api_key": "TEXT",
+        "api_key_preview": "VARCHAR",
+        "has_api_key": "BOOLEAN DEFAULT FALSE",
+        # Chat pricing columns
+        "price_per_conversation_cents": "INTEGER",
+        "price_per_message_cents": "INTEGER",
+        "is_free": "BOOLEAN DEFAULT TRUE",
+        # OpenClaw columns
         "listing_type": "VARCHAR DEFAULT 'chat'",
         "openclaw_repo_url": "VARCHAR",
         "openclaw_install_instructions": "TEXT",
