@@ -106,10 +106,11 @@ export default function EditAgentPage() {
     getAgentBrainStatus(token, id)
       .then((status) => {
         setBrainStatus(status);
-        if (status.has_system_prompt) {
-          setLlmModel(status.llm_model);
-          setTemperature(status.temperature);
-          setMaxTokens(status.max_tokens);
+        setLlmModel(status.model);
+        setTemperature(status.temperature);
+        setMaxTokens(status.max_tokens);
+        if (status.system_prompt) {
+          setSystemPrompt(status.system_prompt);
         }
       })
       .catch(() => {});
@@ -295,6 +296,7 @@ export default function EditAgentPage() {
               >
                 <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
                 <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+                <option value="claude-opus-4-6">Claude Opus 4.6</option>
               </select>
             </div>
             <Input

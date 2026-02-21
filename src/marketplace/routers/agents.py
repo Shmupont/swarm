@@ -347,6 +347,7 @@ def get_brain_status(
 
     return {
         "has_system_prompt": bool(agent.system_prompt),
+        "system_prompt": agent.system_prompt or "",
         "has_api_key": agent.has_api_key,
         "api_key_preview": agent.api_key_preview,
         "model": agent.llm_model,

@@ -115,12 +115,18 @@ export interface ChatResponse {
 
 export interface BrainStatus {
   has_system_prompt: boolean;
+  system_prompt: string;
   has_api_key: boolean;
   api_key_preview: string | null;
-  llm_model: string;
+  model: string;
   temperature: number;
   max_tokens: number;
   is_chat_ready: boolean;
+  pricing: {
+    is_free: boolean;
+    per_conversation_cents: number | null;
+    per_message_cents: number | null;
+  };
 }
 
 export interface Conversation {
@@ -568,7 +574,7 @@ export async function configureAgentBrain(
 }
 
 export async function setAgentApiKey(token: string, agentId: string, api_key: string) {
-  return apiFetch<{ message: string; api_key_preview: string }>(
+  return apiFetch<{ status: string; preview: string }>(
     `/agents/${agentId}/api-key`,
     {
       method: "POST",
