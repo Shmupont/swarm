@@ -72,6 +72,14 @@ def create_agent_profile(
     if data.category not in AGENT_CATEGORIES:
         raise HTTPException(400, f"Invalid category. Must be one of: {AGENT_CATEGORIES}")
 
+    # Enforce 12-agent limit per user
+    MAX_AGENTS_PER_USER = 12
+    existing_count = session.exec(
+        select(AgentProfile).where(AgentProfile.owner_id == user.id)
+    ).all()
+    if len(existing_count) >= MAX_AGENTS_PER_USER:
+        raise HTTPException(400, f"Agent limit reached. Maximum {MAX_AGENTS_PER_USER} agents per user.")
+
     base_slug = generate_slug(data.name)
     slug = ensure_unique_slug(session, base_slug)
 
