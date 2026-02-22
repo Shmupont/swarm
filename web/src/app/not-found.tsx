@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
       <div className="flex items-center gap-2 mb-8">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#2DD4BF] to-[#38BDF8] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#F97316] to-[#EF4444] flex items-center justify-center">
           <span className="text-[#0A0F13] font-bold text-sm">S</span>
         </div>
         <span className="font-bold text-lg text-foreground tracking-tight">SWARM</span>

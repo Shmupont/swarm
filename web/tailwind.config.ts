@@ -13,11 +13,11 @@ const config: Config = {
         elevated: "#48484A",
         "card-hover": "#333335",
 
-        /* ── Accent — Turquoise ── */
-        accent: "#2DD4BF",
-        "accent-muted": "rgba(45, 212, 191, 0.12)",
-        "accent-hover": "#5EEAD4",
-        "accent-soft": "rgba(45, 212, 191, 0.12)",
+        /* ── Accent — Red/Amber ── */
+        accent: "#F97316",
+        "accent-muted": "rgba(249, 115, 22, 0.12)",
+        "accent-hover": "#FB923C",
+        "accent-soft": "rgba(249, 115, 22, 0.12)",
 
         /* ── Text ── */
         foreground: "#F5F5F7",
@@ -35,8 +35,8 @@ const config: Config = {
         info: "#64D2FF",
 
         /* keep secondary for compat */
-        secondary: "#38BDF8",
-        "secondary-muted": "rgba(56, 189, 248, 0.12)",
+        secondary: "#EF4444",
+        "secondary-muted": "rgba(239, 68, 68, 0.12)",
       },
       fontFamily: {
         display: ["Clash Display", "system-ui", "sans-serif"],
@@ -47,7 +47,7 @@ const config: Config = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-accent":
-          "linear-gradient(135deg, #2DD4BF 0%, #38BDF8 100%)",
+          "linear-gradient(135deg, #F97316 0%, #EF4444 100%)",
       },
       borderRadius: {
         "squircle": "22%",
