@@ -3,17 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Bot, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, User, Loader2, Zap } from "lucide-react";
 import { NavBar } from "@/components/navbar";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getAgentBySlug,
   startChatSession,
   sendChatMessage,
   getChatSession,
+  getCreditBalance,
 } from "@/lib/api";
 import { getToken, isLoggedIn } from "@/lib/auth";
 import type { AgentProfile, ChatSession, ChatMessage } from "@/lib/api";
@@ -30,6 +30,8 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [inlineError, setInlineError] = useState("");
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,11 +41,11 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, sending]);
 
   useEffect(() => {
     if (!isLoggedIn()) {
-      router.push("/login");
+      router.push(`/login?redirect=/agents/${slug}/chat`);
       return;
     }
 
@@ -51,14 +53,20 @@ export default function ChatPage() {
     if (!token || !slug) return;
 
     setLoading(true);
-    getAgentBySlug(slug)
-      .then((a) => {
+    Promise.all([
+      getAgentBySlug(slug),
+      getCreditBalance(token).catch(() => null),
+    ])
+      .then(([a, balance]) => {
         setAgent(a);
+        if (balance) setCreditBalance(balance.credit_balance);
+
         if (!a.is_chat_ready) {
           setError("This agent is not configured for chat yet.");
           setLoading(false);
-          return;
+          return Promise.resolve(undefined);
         }
+
         // Check URL for existing session
         const urlParams = new URLSearchParams(window.location.search);
         const existingSessionId = urlParams.get("session");
@@ -68,12 +76,26 @@ export default function ChatPage() {
             setMessages(data.messages);
           });
         }
-        // Start a new session
+        // Start new session
         return startChatSession(token, slug).then((s) => {
           setSession(s);
         });
       })
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : "Failed to start chat";
+        if (msg.toLowerCase().includes("no active license") || msg.includes("no_license")) {
+          // Redirect to agent profile to hire
+          router.push(`/agents/${slug}`);
+          return;
+        }
+        if (msg.includes("insufficient_credits") || msg.includes("402")) {
+          setError(`You need more credits to chat with this agent. Top up at /credits.`);
+        } else if (msg.includes("not_configured") || msg.includes("503")) {
+          setError("This agent isn't ready to chat yet.");
+        } else {
+          setError(msg);
+        }
+      })
       .finally(() => setLoading(false));
   }, [slug, router]);
 
@@ -85,6 +107,7 @@ export default function ChatPage() {
     const content = input.trim();
     setInput("");
     setSending(true);
+    setInlineError("");
 
     // Optimistic user message
     const tempUserMsg: ChatMessage = {
@@ -100,16 +123,29 @@ export default function ChatPage() {
 
     try {
       const result = await sendChatMessage(token, session.id, content);
-      // Replace temp message with real ones
       setMessages((prev) => [
         ...prev.filter((m) => m.id !== tempUserMsg.id),
         result.user_message,
         result.assistant_message,
       ]);
+      // Update credit balance if returned
+      if (result.credit_balance !== null && result.credit_balance !== undefined) {
+        setCreditBalance(result.credit_balance);
+      }
     } catch (err) {
-      // Remove optimistic message on error
       setMessages((prev) => prev.filter((m) => m.id !== tempUserMsg.id));
-      setError(err instanceof Error ? err.message : "Failed to send message");
+      const msg = err instanceof Error ? err.message : "Failed to send message";
+      if (msg.includes("insufficient_credits") || msg.includes("402")) {
+        setInlineError("⚡ Out of credits — ");
+      } else if (msg.includes("no_license") || msg.includes("403")) {
+        router.push(`/agents/${slug}`);
+        return;
+      } else if (msg.includes("not_configured") || msg.includes("503")) {
+        setInlineError("This agent isn't ready to chat yet.");
+      } else {
+        setInlineError(msg);
+        setInput(content); // restore for retry
+      }
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -142,28 +178,40 @@ export default function ChatPage() {
       <div className="min-h-screen flex flex-col">
         <NavBar />
         <main className="flex-1 pt-24 pb-12 flex items-center justify-center">
-          <div className="text-center">
-            <Bot className="w-12 h-12 text-muted-2 mx-auto mb-4" />
+          <div className="text-center max-w-md px-4">
+            <div className="w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center mx-auto mb-4">
+              <Zap className="w-8 h-8 text-muted" />
+            </div>
             <h1 className="font-display text-2xl font-bold text-foreground mb-2">
-              Chat Unavailable
+              {error.includes("credits") ? "Out of Credits" : "Chat Unavailable"}
             </h1>
-            <p className="text-muted mb-4">{error}</p>
-            <Button onClick={() => router.push(`/agents/${slug}`)}>
-              Back to Agent
-            </Button>
+            <p className="text-muted mb-6">{error}</p>
+            <div className="flex gap-3 justify-center">
+              {error.includes("credits") && (
+                <Button onClick={() => router.push("/credits")}>
+                  Top Up Credits
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => router.push(`/agents/${slug}`)}>
+                Back to Agent
+              </Button>
+            </div>
           </div>
         </main>
       </div>
     );
   }
 
+  const welcomeMsg = agent?.welcome_message;
+  const pricePerMsg = agent?.price_per_message_credits ?? 0;
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
       <NavBar />
 
-      <main className="flex-1 pt-20 pb-0 flex flex-col">
+      <div className="flex-1 flex flex-col pt-16 min-h-0">
         {/* Chat header */}
-        <div className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-16 z-10">
+        <div className="border-b border-border bg-background/90 backdrop-blur-sm shrink-0">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
             <button
               onClick={() => router.push(`/agents/${slug}`)}
@@ -173,11 +221,7 @@ export default function ChatPage() {
             </button>
             {agent && (
               <>
-                <Avatar
-                  src={agent.avatar_url}
-                  name={agent.name}
-                  size="sm"
-                />
+                <Avatar src={agent.avatar_url} name={agent.name} size="sm" />
                 <div className="flex-1 min-w-0">
                   <h1 className="font-heading font-bold text-foreground text-sm truncate">
                     {agent.name}
@@ -186,15 +230,24 @@ export default function ChatPage() {
                 </div>
               </>
             )}
+            {creditBalance !== null && (
+              <div className="flex items-center gap-1.5 bg-surface-2 px-3 py-1.5 rounded-xl shrink-0">
+                <Zap className="w-3.5 h-3.5 text-accent" />
+                <span className="text-sm font-mono font-bold text-foreground">
+                  {creditBalance.toLocaleString()}
+                </span>
+                <span className="text-xs text-muted">cr</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-            {/* Welcome message */}
+            {/* Welcome state / welcome message */}
             {messages.length === 0 && !sending && (
-              <div className="text-center py-12">
+              <div className="text-center py-10">
                 {agent && (
                   <Avatar
                     src={agent.avatar_url}
@@ -204,14 +257,20 @@ export default function ChatPage() {
                   />
                 )}
                 <h2 className="font-heading text-lg font-bold text-foreground mb-2">
-                  Chat with {agent?.name}
+                  {welcomeMsg ? "" : `Chat with ${agent?.name}`}
                 </h2>
-                <p className="text-sm text-muted max-w-md mx-auto">
-                  {agent?.tagline || "Start a conversation with this agent."}
-                </p>
-                {!agent?.is_free && (
-                  <p className="text-xs text-accent mt-2">
-                    This is a paid agent.
+                {welcomeMsg ? (
+                  <div className="flex justify-start max-w-md mx-auto">
+                    <div className="bg-surface-2 text-foreground rounded-2xl rounded-bl-md px-4 py-3 text-sm text-left">
+                      <p className="whitespace-pre-wrap leading-relaxed">{welcomeMsg}</p>
+                      <p className="text-[10px] mt-1.5 text-muted-2">
+                        {new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted max-w-md mx-auto">
+                    {agent?.tagline || "Start a conversation with this agent."}
                   </p>
                 )}
               </div>
@@ -225,9 +284,7 @@ export default function ChatPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className={`flex gap-3 ${
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {msg.role === "assistant" && agent && (
                     <Avatar
@@ -244,14 +301,10 @@ export default function ChatPage() {
                         : "bg-surface-2 text-foreground rounded-bl-md"
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {msg.content}
-                    </p>
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                     <p
                       className={`text-[10px] mt-1.5 ${
-                        msg.role === "user"
-                          ? "text-background/60"
-                          : "text-muted-2"
+                        msg.role === "user" ? "text-background/60" : "text-muted-2"
                       }`}
                     >
                       {new Date(msg.created_at).toLocaleTimeString([], {
@@ -277,12 +330,7 @@ export default function ChatPage() {
                 className="flex gap-3 justify-start"
               >
                 {agent && (
-                  <Avatar
-                    src={agent.avatar_url}
-                    name={agent.name}
-                    size="sm"
-                    className="shrink-0 mt-1"
-                  />
+                  <Avatar src={agent.avatar_url} name={agent.name} size="sm" className="shrink-0 mt-1" />
                 )}
                 <div className="bg-surface-2 rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex items-center gap-1.5">
@@ -294,7 +342,20 @@ export default function ChatPage() {
               </motion.div>
             )}
 
-            {/* Error message */}
+            {/* Inline error */}
+            {inlineError && (
+              <div className="text-center">
+                <p className="text-sm bg-error/10 inline-flex items-center gap-1 px-4 py-2 rounded-xl text-error">
+                  {inlineError}
+                  {inlineError.includes("credits") && (
+                    <a href="/credits" className="underline text-accent hover:text-accent-hover">
+                      Top up
+                    </a>
+                  )}
+                </p>
+              </div>
+            )}
+
             {error && session && (
               <div className="text-center">
                 <p className="text-sm text-error bg-error/10 inline-block px-4 py-2 rounded-xl">
@@ -308,7 +369,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input bar */}
-        <div className="border-t border-border bg-background/80 backdrop-blur-sm">
+        <div className="border-t border-border bg-background/90 backdrop-blur-sm shrink-0">
           <div className="max-w-3xl mx-auto px-4 py-3">
             <div className="flex items-end gap-3">
               <textarea
@@ -335,9 +396,15 @@ export default function ChatPage() {
                 )}
               </Button>
             </div>
+            {pricePerMsg > 0 && (
+              <p className="text-xs text-muted mt-1.5 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-accent" />
+                {pricePerMsg} credits/message
+              </p>
+            )}
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

@@ -71,9 +71,12 @@ def on_startup():
 
     _migrate_table("agent_profiles", {
         "system_prompt": "TEXT",
+        "welcome_message": "TEXT",
         "llm_model": "VARCHAR DEFAULT 'claude-sonnet-4-20250514'",
+        "llm_provider": "VARCHAR DEFAULT 'anthropic'",
         "temperature": "FLOAT DEFAULT 0.7",
         "max_tokens": "INTEGER DEFAULT 1024",
+        "price_per_message_credits": "INTEGER DEFAULT 0",
         "encrypted_api_key": "TEXT",
         "api_key_preview": "VARCHAR",
         "has_api_key": "BOOLEAN DEFAULT FALSE",
@@ -102,6 +105,17 @@ def on_startup():
         "credits_spent": "INTEGER DEFAULT 0",
         "creator_credits_earned": "INTEGER DEFAULT 0",
     })
+
+    # Make pricing_plan_id nullable in agent_licenses (for chat-agent hire flow)
+    try:
+        with engine.connect() as conn:
+            # PostgreSQL
+            conn.execute(text(
+                "ALTER TABLE agent_licenses ALTER COLUMN pricing_plan_id DROP NOT NULL"
+            ))
+            conn.commit()
+    except Exception:
+        pass  # Already nullable or SQLite (no-op for SQLite)
 
     _migrate_table("proxy_usage_logs", {
         "credits_charged": "INTEGER DEFAULT 0",

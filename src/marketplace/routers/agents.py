@@ -6,7 +6,7 @@ from sqlmodel import Session, col, func, select
 
 from ..auth import get_current_user
 from ..database import get_session
-from ..licenses import create_license
+from ..licenses import create_license, generate_license_key
 from ..models import (
     AGENT_CATEGORIES,
     AgentLicense,
@@ -20,6 +20,8 @@ from ..models import (
 )
 from ..schemas import (
     AgentBriefResponse,
+    AgentConfigUpdateRequest,
+    AgentConfigResponse,
     AgentCreateRequest,
     AgentResponse,
     AgentUpdateRequest,
@@ -27,6 +29,7 @@ from ..schemas import (
     AgentApiKeyRequest,
     AgentPricingRequest,
     DashboardStatsResponse,
+    HireResponse,
     LicenseResponse,
     PricingPlanCreateRequest,
     PricingPlanResponse,
@@ -53,6 +56,9 @@ def _enrich(profile: AgentProfile, session: Session) -> AgentResponse:
     resp.is_free = profile.is_free
     resp.price_per_conversation_cents = profile.price_per_conversation_cents
     resp.price_per_message_cents = profile.price_per_message_cents
+    resp.price_per_message_credits = profile.price_per_message_credits
+    resp.welcome_message = profile.welcome_message
+    resp.llm_provider = profile.llm_provider
     resp.listing_type = profile.listing_type
     resp.openclaw_repo_url = profile.openclaw_repo_url
     resp.openclaw_install_instructions = profile.openclaw_install_instructions
@@ -400,6 +406,161 @@ def get_brain_status(
             "per_message_cents": agent.price_per_message_cents,
         },
     }
+
+
+# ── Agent AI Config (owner-only) ────────────────────────────────
+
+
+@router.get("/agents/{id}/config", response_model=AgentConfigResponse)
+def get_agent_config(
+    id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+    return AgentConfigResponse(
+        system_prompt=agent.system_prompt,
+        welcome_message=agent.welcome_message,
+        llm_model=agent.llm_model,
+        llm_provider=agent.llm_provider,
+        price_per_message_credits=agent.price_per_message_credits,
+        has_api_key=agent.has_api_key,
+        api_key_preview=agent.api_key_preview,
+    )
+
+
+@router.patch("/agents/{id}/config", response_model=AgentConfigResponse)
+def update_agent_config(
+    id: uuid.UUID,
+    data: AgentConfigUpdateRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, id)
+    if not agent or agent.owner_id != user.id:
+        raise HTTPException(403, "Not your agent")
+
+    if data.system_prompt is not None:
+        agent.system_prompt = data.system_prompt
+    if data.welcome_message is not None:
+        agent.welcome_message = data.welcome_message
+    if data.llm_model is not None:
+        agent.llm_model = data.llm_model
+    if data.llm_provider is not None:
+        if data.llm_provider not in ("anthropic", "openai"):
+            raise HTTPException(400, "llm_provider must be 'anthropic' or 'openai'")
+        agent.llm_provider = data.llm_provider
+    if data.price_per_message_credits is not None:
+        if data.price_per_message_credits < 0:
+            raise HTTPException(400, "price_per_message_credits must be >= 0")
+        agent.price_per_message_credits = data.price_per_message_credits
+    if data.api_key is not None and data.api_key.strip():
+        agent.encrypted_api_key = encrypt_api_key(data.api_key.strip())
+        agent.api_key_preview = mask_api_key(data.api_key.strip())
+        agent.has_api_key = True
+
+    agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
+    session.add(agent)
+    session.commit()
+    session.refresh(agent)
+
+    return AgentConfigResponse(
+        system_prompt=agent.system_prompt,
+        welcome_message=agent.welcome_message,
+        llm_model=agent.llm_model,
+        llm_provider=agent.llm_provider,
+        price_per_message_credits=agent.price_per_message_credits,
+        has_api_key=agent.has_api_key,
+        api_key_preview=agent.api_key_preview,
+    )
+
+
+# ── Hire / License for Chat Agents ──────────────────────────────
+
+
+@router.post("/agents/{agent_id}/hire", response_model=HireResponse)
+def hire_agent(
+    agent_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+
+    # Check for existing active license (idempotent)
+    existing = session.exec(
+        select(AgentLicense).where(
+            AgentLicense.agent_profile_id == agent_id,
+            AgentLicense.buyer_id == user.id,
+            AgentLicense.status == "active",
+        )
+    ).first()
+    if existing:
+        return HireResponse(
+            license_id=existing.id,
+            agent_id=agent.id,
+            agent_slug=agent.slug,
+            price_per_message=agent.price_per_message_credits,
+            welcome_message=agent.welcome_message,
+        )
+
+    # Credit check for paid agents (need at least 1 message worth)
+    if agent.price_per_message_credits > 0 and user.credit_balance < agent.price_per_message_credits:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "message": "Insufficient credits",
+                "code": "insufficient_credits",
+                "needed": agent.price_per_message_credits,
+                "have": user.credit_balance,
+            },
+        )
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    license = AgentLicense(
+        agent_profile_id=agent_id,
+        buyer_id=user.id,
+        pricing_plan_id=None,
+        license_key=generate_license_key(),
+        status="active",
+        activated_at=now,
+        period_start=now,
+    )
+    session.add(license)
+
+    # Bump hire count
+    agent.total_hires += 1
+    session.add(agent)
+
+    session.commit()
+    session.refresh(license)
+
+    return HireResponse(
+        license_id=license.id,
+        agent_id=agent.id,
+        agent_slug=agent.slug,
+        price_per_message=agent.price_per_message_credits,
+        welcome_message=agent.welcome_message,
+    )
+
+
+@router.get("/agents/{agent_id}/license-status")
+def get_license_status(
+    agent_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    license = session.exec(
+        select(AgentLicense).where(
+            AgentLicense.agent_profile_id == agent_id,
+            AgentLicense.buyer_id == user.id,
+            AgentLicense.status == "active",
+        )
+    ).first()
+    return {"has_license": license is not None, "license_id": str(license.id) if license else None}
 
 
 # ── Webhook Config (JWT, owner) ────────────────────────────────────

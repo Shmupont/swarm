@@ -111,9 +111,14 @@ class AgentProfile(SQLModel, table=True):
     system_prompt: str | None = Field(
         default=None, sa_column=Column("system_prompt", Text, nullable=True)
     )
+    welcome_message: str | None = Field(
+        default=None, sa_column=Column("welcome_message", Text, nullable=True)
+    )
     llm_model: str = Field(default="claude-sonnet-4-20250514")
+    llm_provider: str = Field(default="anthropic")  # "anthropic" | "openai"
     temperature: float = Field(default=0.7)
     max_tokens: int = Field(default=1024)
+    price_per_message_credits: int = Field(default=0)  # 0 = free
 
     # Creator's API Key (encrypted)
     encrypted_api_key: str | None = Field(
@@ -383,7 +388,7 @@ class AgentLicense(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
     buyer_id: uuid.UUID = Field(foreign_key="users.id", index=True)
-    pricing_plan_id: uuid.UUID = Field(foreign_key="agent_pricing_plans.id")
+    pricing_plan_id: uuid.UUID | None = Field(default=None, foreign_key="agent_pricing_plans.id", nullable=True)
 
     license_key: str = Field(unique=True, index=True)
     status: str = Field(default="active")  # active, expired, revoked, suspended

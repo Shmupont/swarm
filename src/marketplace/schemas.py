@@ -119,6 +119,9 @@ class AgentResponse(BaseModel):
     is_free: bool = True
     price_per_conversation_cents: int | None = None
     price_per_message_cents: int | None = None
+    price_per_message_credits: int = 0
+    welcome_message: str | None = None
+    llm_provider: str = "anthropic"
 
     # OpenClaw fields
     listing_type: str = "chat"
@@ -354,6 +357,39 @@ class AgentPricingRequest(BaseModel):
     is_free: bool = True
 
 
+# ── Agent AI Config (combined) ────────────────────────────────
+
+
+class AgentConfigUpdateRequest(BaseModel):
+    system_prompt: str | None = None
+    welcome_message: str | None = None
+    llm_model: str | None = None
+    llm_provider: str | None = None
+    price_per_message_credits: int | None = None
+    api_key: str | None = None  # if provided, encrypt and store
+
+
+class AgentConfigResponse(BaseModel):
+    system_prompt: str | None = None
+    welcome_message: str | None = None
+    llm_model: str = "claude-sonnet-4-20250514"
+    llm_provider: str = "anthropic"
+    price_per_message_credits: int = 0
+    has_api_key: bool = False
+    api_key_preview: str | None = None
+
+
+# ── Hire Flow ─────────────────────────────────────────────────
+
+
+class HireResponse(BaseModel):
+    license_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_slug: str
+    price_per_message: int
+    welcome_message: str | None = None
+
+
 # ── Chat Sessions ────────────────────────────────────────────
 
 
@@ -388,6 +424,7 @@ class ChatMessageResponse(BaseModel):
 class ChatResponse(BaseModel):
     user_message: ChatMessageResponse
     assistant_message: ChatMessageResponse
+    credit_balance: int | None = None  # user's balance after deduction
 
 
 # ── Pricing Plans & Licenses ─────────────────────────────────

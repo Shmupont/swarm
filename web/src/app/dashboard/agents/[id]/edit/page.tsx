@@ -202,9 +202,20 @@ export default function EditAgentPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="font-heading text-2xl font-bold text-foreground mb-6">
-        Edit Agent
-      </h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          Edit Agent
+        </h1>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => router.push(`/dashboard/agents/${id}/config`)}
+          className="gap-2"
+        >
+          ⚙ Configure AI
+        </Button>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (

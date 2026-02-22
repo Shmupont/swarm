@@ -80,6 +80,9 @@ export interface AgentProfile {
   is_free: boolean;
   price_per_conversation_cents: number | null;
   price_per_message_cents: number | null;
+  price_per_message_credits: number;
+  welcome_message: string | null;
+  llm_provider: string;
   // OpenClaw
   listing_type: "chat" | "openclaw";
   openclaw_repo_url: string | null;
@@ -116,6 +119,39 @@ export interface ChatMessage {
 export interface ChatResponse {
   user_message: ChatMessage;
   assistant_message: ChatMessage;
+  credit_balance: number | null;
+}
+
+export interface AgentConfig {
+  system_prompt: string | null;
+  welcome_message: string | null;
+  llm_model: string;
+  llm_provider: string;
+  price_per_message_credits: number;
+  has_api_key: boolean;
+  api_key_preview: string | null;
+}
+
+export interface AgentConfigUpdate {
+  system_prompt?: string;
+  welcome_message?: string;
+  llm_model?: string;
+  llm_provider?: string;
+  price_per_message_credits?: number;
+  api_key?: string;
+}
+
+export interface HireResponse {
+  license_id: string;
+  agent_id: string;
+  agent_slug: string;
+  price_per_message: number;
+  welcome_message: string | null;
+}
+
+export interface LicenseStatus {
+  has_license: boolean;
+  license_id: string | null;
 }
 
 export interface BrainStatus {
@@ -644,6 +680,40 @@ export async function getChatSession(token: string, sessionId: string) {
 
 export async function listChatSessions(token: string) {
   return apiFetch<ChatSession[]>("/sessions", { token });
+}
+
+// ── Hire Flow ──────────────────────────────────────────────────
+
+export async function hireAgent(agentId: string, token: string) {
+  return apiFetch<HireResponse>(`/agents/${agentId}/hire`, {
+    method: "POST",
+    token,
+  });
+}
+
+export async function getAgentLicenseStatus(agentId: string, token: string) {
+  return apiFetch<LicenseStatus>(`/agents/${agentId}/license-status`, { token });
+}
+
+// ── Agent AI Config ────────────────────────────────────────────
+
+export async function getAgentConfig(agentId: string, token: string) {
+  return apiFetch<AgentConfig>(`/agents/${agentId}/config`, { token });
+}
+
+export async function updateAgentConfig(agentId: string, data: AgentConfigUpdate, token: string) {
+  return apiFetch<AgentConfig>(`/agents/${agentId}/config`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+    token,
+  });
+}
+
+export async function getChatHistory(agentId: string, token: string) {
+  return apiFetch<{ session: ChatSession; messages: ChatMessage[] }[]>(
+    `/sessions?agent=${agentId}`,
+    { token }
+  );
 }
 
 // ── Pricing Plans & Licenses ──────────────────────────────────

@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from ..auth import get_current_user
 from ..database import get_session
-from ..models import AgentProfile, AgentSession, AgentChatMessage, User, _utcnow
+from ..models import AgentLicense, AgentProfile, AgentSession, AgentChatMessage, User, _utcnow
 from ..schemas import (
     SessionResponse,
     ChatSendMessageRequest,
@@ -56,10 +56,31 @@ def start_session(
     ).first()
     if not agent:
         raise HTTPException(404, "Agent not found")
-    if not agent.system_prompt:
-        raise HTTPException(400, "This agent is not configured for chat yet")
-    if not agent.has_api_key or not agent.encrypted_api_key:
-        raise HTTPException(400, "This agent is not configured for chat yet")
+    if not agent.system_prompt or not agent.has_api_key or not agent.encrypted_api_key:
+        raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
+
+    # Check active license
+    license_record = session.exec(
+        select(AgentLicense).where(
+            AgentLicense.agent_profile_id == agent.id,
+            AgentLicense.buyer_id == user.id,
+            AgentLicense.status == "active",
+        )
+    ).first()
+    if not license_record:
+        raise HTTPException(403, detail={"detail": "No active license. Hire this agent first.", "code": "no_license"})
+
+    # Credit check
+    if agent.price_per_message_credits > 0 and user.credit_balance < agent.price_per_message_credits:
+        raise HTTPException(
+            402,
+            detail={
+                "detail": "Insufficient credits",
+                "code": "insufficient_credits",
+                "needed": agent.price_per_message_credits,
+                "have": user.credit_balance,
+            },
+        )
 
     chat_session = AgentSession(
         agent_profile_id=agent.id,
@@ -88,7 +109,34 @@ def send_message(
 
     agent = session.get(AgentProfile, chat_session.agent_profile_id)
     if not agent or not agent.encrypted_api_key or not agent.system_prompt:
-        raise HTTPException(400, "Agent is not properly configured")
+        raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
+
+    # License check
+    license_record = session.exec(
+        select(AgentLicense).where(
+            AgentLicense.agent_profile_id == agent.id,
+            AgentLicense.buyer_id == user.id,
+            AgentLicense.status == "active",
+        )
+    ).first()
+    if not license_record:
+        raise HTTPException(403, detail={"detail": "No active license. Hire this agent first.", "code": "no_license"})
+
+    # Credit check
+    credits_to_charge = agent.price_per_message_credits
+    if credits_to_charge > 0:
+        # Re-fetch user for fresh balance
+        fresh_user = session.get(User, user.id)
+        if fresh_user and fresh_user.credit_balance < credits_to_charge:
+            raise HTTPException(
+                402,
+                detail={
+                    "detail": "Insufficient credits",
+                    "code": "insufficient_credits",
+                    "needed": credits_to_charge,
+                    "have": fresh_user.credit_balance,
+                },
+            )
 
     user_msg = AgentChatMessage(
         session_id=chat_session.id,
@@ -137,6 +185,25 @@ def send_message(
         chat_session.title = data.content[:80] + ("..." if len(data.content) > 80 else "")
 
     session.add(chat_session)
+
+    # Deduct credits on success
+    new_balance: int | None = None
+    if credits_to_charge > 0:
+        buyer = session.get(User, user.id)
+        if buyer:
+            buyer.credit_balance = max(0, buyer.credit_balance - credits_to_charge)
+            session.add(buyer)
+            new_balance = buyer.credit_balance
+            # Credit creator
+            creator = session.get(User, agent.owner_id)
+            platform_fee = round(credits_to_charge * 0.10)
+            creator_credits = credits_to_charge - platform_fee
+            if creator:
+                creator.credit_balance += creator_credits
+                session.add(creator)
+            agent.total_earned_credits += creator_credits
+            session.add(agent)
+
     session.commit()
     session.refresh(user_msg)
     session.refresh(assistant_msg)
@@ -144,6 +211,7 @@ def send_message(
     return ChatResponse(
         user_message=_msg_response(user_msg),
         assistant_message=_msg_response(assistant_msg),
+        credit_balance=new_balance,
     )
 
 

@@ -36,6 +36,8 @@ import {
   getAgentPosts,
   getAgentPricingPlans,
   purchaseAgentAccess,
+  hireAgent,
+  getAgentLicenseStatus,
 } from "@/lib/api";
 import { isLoggedIn, getToken } from "@/lib/auth";
 import { getCategoryLabel } from "@/lib/categories";
@@ -61,6 +63,11 @@ export default function AgentProfilePage() {
   const [purchaseResult, setPurchaseResult] = useState<PurchaseResponse | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
+  // Hire / chat state
+  const [hiring, setHiring] = useState(false);
+  const [hasLicense, setHasLicense] = useState(false);
+  const [hireError, setHireError] = useState("");
+
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
@@ -69,6 +76,15 @@ export default function AgentProfilePage() {
         setAgent(a);
         if (a.listing_type === "openclaw") {
           getAgentPricingPlans(a.id).then(setPricingPlans).catch(() => {});
+        }
+        // Check license status for chat agents if logged in
+        if (a.listing_type === "chat" && a.is_chat_ready && isLoggedIn()) {
+          const token = getToken();
+          if (token) {
+            getAgentLicenseStatus(a.id, token)
+              .then((status) => setHasLicense(status.has_license))
+              .catch(() => {});
+          }
         }
       })
       .catch((err) => setError(err.message))
@@ -103,6 +119,30 @@ export default function AgentProfilePage() {
       return;
     }
     router.push(`/agents/${slug}/chat`);
+  };
+
+  const handleHire = async () => {
+    if (!isLoggedIn()) {
+      router.push(`/login?redirect=/agents/${slug}`);
+      return;
+    }
+    if (!agent) return;
+    const token = getToken();
+    if (!token) return;
+    setHiring(true);
+    setHireError("");
+    try {
+      await hireAgent(agent.id, token);
+      router.push(`/agents/${slug}/chat`);
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("402")) {
+        setHireError(`Insufficient credits. Top up at /credits.`);
+      } else {
+        setHireError(err instanceof Error ? err.message : "Failed to hire agent");
+      }
+    } finally {
+      setHiring(false);
+    }
   };
 
   const handlePurchase = async (planId: string) => {
@@ -200,19 +240,33 @@ export default function AgentProfilePage() {
                         <Button onClick={() => setActiveTab("about")} className="gap-2">
                           <Package className="w-4 h-4" /> Get Access
                         </Button>
-                      ) : (
-                        <>
-                          {agent.is_chat_ready && (
+                      ) : agent.is_chat_ready ? (
+                        <div className="flex flex-col items-end gap-1">
+                          {agent.price_per_message_credits > 0 && (
+                            <p className="text-sm text-muted">
+                              <span className="text-accent font-bold">⚡ {agent.price_per_message_credits}</span>
+                              <span className="text-xs ml-1">credits/msg</span>
+                            </p>
+                          )}
+                          {hasLicense ? (
                             <Button onClick={handleChat} className="gap-2">
-                              <Bot className="w-4 h-4" /> Use This Agent
+                              <Bot className="w-4 h-4" /> Continue Chatting →
+                            </Button>
+                          ) : (
+                            <Button onClick={handleHire} disabled={hiring} className="gap-2">
+                              <Bot className="w-4 h-4" />
+                              {hiring ? "..." : agent.price_per_message_credits === 0 ? "Chat Free →" : "Hire Agent →"}
                             </Button>
                           )}
+                        </div>
+                      ) : (
+                        <>
                           {agent.is_docked && agent.api_endpoint ? (
-                            <Button onClick={handleSendTask} variant={agent.is_chat_ready ? "secondary" : "primary"} className="gap-2">
+                            <Button onClick={handleSendTask} className="gap-2">
                               <Send className="w-4 h-4" /> Send Task
                             </Button>
                           ) : (
-                            <Button onClick={handleContact} variant={agent.is_chat_ready ? "secondary" : "primary"} className="gap-2">
+                            <Button onClick={handleContact} className="gap-2">
                               <MessageSquare className="w-4 h-4" /> Message
                             </Button>
                           )}
@@ -247,6 +301,16 @@ export default function AgentProfilePage() {
                       <span className="text-sm text-muted">by {agent.owner_display_name}</span>
                     )}
                   </div>
+
+                  {/* Hire error */}
+                  {hireError && (
+                    <div className="mt-3 text-sm text-error bg-error/10 px-3 py-2 rounded-xl">
+                      {hireError}{" "}
+                      {hireError.includes("credits") && (
+                        <a href="/credits" className="underline hover:text-accent">Top up →</a>
+                      )}
+                    </div>
+                  )}
 
                   {/* Stats — nested card-inner blocks */}
                   <div className="flex items-center gap-3 mt-5">
@@ -595,19 +659,37 @@ export default function AgentProfilePage() {
 
                   {agent.listing_type !== "openclaw" && (
                     <>
-                      {agent.is_chat_ready && (
-                        <Button onClick={handleChat} className="w-full gap-2">
-                          <Bot className="w-4 h-4" /> Use This Agent
-                        </Button>
-                      )}
-                      {agent.is_docked && agent.api_endpoint ? (
-                        <Button onClick={handleSendTask} variant={agent.is_chat_ready ? "secondary" : "primary"} className="w-full gap-2">
-                          <Send className="w-4 h-4" /> Send Task
-                        </Button>
+                      {agent.is_chat_ready ? (
+                        <div className="space-y-2">
+                          {agent.price_per_message_credits > 0 && (
+                            <p className="text-center">
+                              <span className="text-accent font-bold text-lg">⚡ {agent.price_per_message_credits}</span>
+                              <span className="text-muted text-sm ml-1">credits / message</span>
+                            </p>
+                          )}
+                          {hasLicense ? (
+                            <Button onClick={handleChat} className="w-full gap-2">
+                              <Bot className="w-4 h-4" /> Continue Chatting →
+                            </Button>
+                          ) : (
+                            <Button onClick={handleHire} disabled={hiring} className="w-full gap-2">
+                              <Bot className="w-4 h-4" />
+                              {hiring ? "Processing..." : agent.price_per_message_credits === 0 ? "Chat Free →" : "Hire Agent →"}
+                            </Button>
+                          )}
+                        </div>
                       ) : (
-                        <Button onClick={handleContact} variant={agent.is_chat_ready ? "secondary" : "primary"} className="w-full gap-2">
-                          <MessageSquare className="w-4 h-4" /> Contact Agent
-                        </Button>
+                        <>
+                          {agent.is_docked && agent.api_endpoint ? (
+                            <Button onClick={handleSendTask} className="w-full gap-2">
+                              <Send className="w-4 h-4" /> Send Task
+                            </Button>
+                          ) : (
+                            <Button onClick={handleContact} className="w-full gap-2">
+                              <MessageSquare className="w-4 h-4" /> Contact Agent
+                            </Button>
+                          )}
+                        </>
                       )}
                     </>
                   )}
