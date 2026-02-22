@@ -366,7 +366,7 @@ class AgentPricingPlan(SQLModel, table=True):
     # Credits pricing
     credits_per_message: int | None = None
     credits_per_1k_tokens: int | None = None
-    platform_fee_bps: int = Field(default=2000)  # 20% platform fee in basis points
+    platform_fee_bps: int = Field(default=1000)  # 10% platform fee in basis points
 
     plan_name: str
     plan_description: str | None = None
