@@ -7,7 +7,7 @@ from sqlmodel import SQLModel
 from .config import get_settings
 from .database import get_engine
 from .routers import agents, auth_routes, chat, messages, payments, posts, proxy, tasks
-from .routers import selfdock, hive, a2a
+from .routers import selfdock, hive, a2a, mission_control
 
 settings = get_settings()
 
@@ -42,6 +42,7 @@ app.include_router(payments.router)
 app.include_router(selfdock.router)
 app.include_router(hive.router)
 app.include_router(a2a.router)
+app.include_router(mission_control.router)
 
 
 @app.on_event("startup")

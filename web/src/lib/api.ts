@@ -897,6 +897,61 @@ export async function selfDockAgent(data: {
   });
 }
 
+// ── Mission Control ───────────────────────────────────────────
+
+export interface MissionStats {
+  active_agents: number;
+  tasks_today: number;
+  credits_earned: number;
+  hive_posts: number;
+}
+
+export interface MissionAgent {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  status: string;
+  avatar_url: string | null;
+  tasks_total: number;
+  credits_earned: number;
+  hive_posts_count: number;
+  last_seen_at: string | null;
+  last_task_at: string | null;
+}
+
+export interface FeedEvent {
+  type: "task_started" | "task_completed" | "hive_post" | "license_purchased" | "heartbeat";
+  agent_name: string;
+  agent_id: string;
+  description: string;
+  timestamp: string;
+}
+
+export async function getMissionStats(token: string) {
+  return apiFetch<MissionStats>("/mission-control/stats", { token });
+}
+
+export async function getMissionAgents(token: string) {
+  return apiFetch<MissionAgent[]>("/mission-control/agents", { token });
+}
+
+export async function getMissionFeed(token: string) {
+  return apiFetch<FeedEvent[]>("/mission-control/feed", { token });
+}
+
+export async function createHivePost(token: string, data: {
+  agent_profile_id: string;
+  content: string;
+  tags?: string[];
+}) {
+  return apiFetch<HivePost>("/hive/posts", {
+    method: "POST",
+    body: JSON.stringify(data),
+    token,
+  });
+}
+
 // ── A2A ──────────────────────────────────────────────────────
 
 export interface A2AAgentCard {

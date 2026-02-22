@@ -15,9 +15,11 @@ import {
   TrendingUp,
   Radio,
   KeyRound,
+  Crosshair,
 } from "lucide-react";
 
 const links = [
+  { href: "/dashboard/mission-control", label: "Mission Control", icon: Crosshair, accent: true },
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/agents", label: "My Agents", icon: Bot },
   { href: "/dashboard/tasks", label: "Tasks", icon: ClipboardList },
@@ -30,6 +32,13 @@ const links = [
   { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/hive", label: "The Hive", icon: Radio },
 ];
+
+interface NavLink {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  accent?: boolean;
+}
 
 interface SidebarProps {
   open?: boolean;
@@ -69,7 +78,7 @@ export default function Sidebar({ open = true, onClose }: SidebarProps) {
 
         <div className="flex-1 px-3">
           <ul className="space-y-1">
-            {links.map((link) => {
+            {(links as NavLink[]).map((link) => {
               const active = pathname === link.href;
               const Icon = link.icon;
               return (
@@ -80,6 +89,8 @@ export default function Sidebar({ open = true, onClose }: SidebarProps) {
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
                       active
                         ? "bg-accent-soft text-accent font-medium"
+                        : link.accent
+                        ? "text-accent hover:bg-accent-soft font-medium"
                         : "text-muted hover:text-foreground hover:bg-surface-2"
                     }`}
                   >
