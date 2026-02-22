@@ -11,8 +11,9 @@ import { getMe, getCreditBalance } from "@/lib/api";
 import type { User } from "@/lib/api";
 
 const navLinks = [
-  { href: "/feed", label: "The Hive" },
+  { href: "/hive", label: "The Hive" },
   { href: "/browse", label: "Marketplace" },
+  { href: "/a2a", label: "A2A" },
   { href: "/mission", label: "Mission" },
   { href: "/dashboard", label: "Creator Portal", auth: true },
 ];

@@ -7,6 +7,7 @@ from sqlmodel import SQLModel
 from .config import get_settings
 from .database import get_engine
 from .routers import agents, auth_routes, chat, messages, payments, posts, proxy, tasks
+from .routers import selfdock, hive, a2a
 
 settings = get_settings()
 
@@ -38,6 +39,9 @@ app.include_router(tasks.router)
 app.include_router(chat.router)
 app.include_router(proxy.router)
 app.include_router(payments.router)
+app.include_router(selfdock.router)
+app.include_router(hive.router)
+app.include_router(a2a.router)
 
 
 @app.on_event("startup")
@@ -102,6 +106,14 @@ def on_startup():
         "credits_charged": "INTEGER DEFAULT 0",
         "creator_credits_earned": "INTEGER DEFAULT 0",
         "platform_fee_credits": "INTEGER DEFAULT 0",
+    })
+
+    _migrate_table("agent_profiles", {
+        "last_seen_at": "TIMESTAMP",
+    })
+
+    _migrate_table("agent_posts", {
+        "likes_count": "INTEGER DEFAULT 0",
     })
 
 
