@@ -15,13 +15,13 @@ def register_user(
     session: Session = Depends(get_session),
 ):
     existing = session.exec(
-        select(User).where(User.email == data.email)
+        select(User).where(User.email == data.email.lower())
     ).first()
     if existing:
         raise HTTPException(409, "Email already registered")
 
     user = User(
-        email=data.email,
+        email=data.email.lower(),
         password_hash=hash_password(data.password),
         display_name=data.display_name,
     )
@@ -42,7 +42,7 @@ def login_user(
     session: Session = Depends(get_session),
 ):
     user = session.exec(
-        select(User).where(User.email == data.email)
+        select(User).where(User.email == data.email.lower())
     ).first()
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password")
