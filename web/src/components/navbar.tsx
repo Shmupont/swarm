@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Zap } from "lucide-react";
 import { Button } from "./ui/button";
 import { Avatar } from "./ui/avatar";
 import { isLoggedIn, getToken, clearToken } from "@/lib/auth";
-import { getMe } from "@/lib/api";
+import { getMe, getCreditBalance } from "@/lib/api";
 import type { User } from "@/lib/api";
 
 const navLinks = [
@@ -20,6 +20,7 @@ const navLinks = [
 export function NavBar() {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -30,6 +31,9 @@ export function NavBar() {
       getMe(token)
         .then(setUser)
         .catch(() => clearToken());
+      getCreditBalance(token)
+        .then((r) => setCreditBalance(r.credit_balance))
+        .catch(() => {});
     }
   }, []);
 
@@ -81,6 +85,15 @@ export function NavBar() {
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3">
+                {creditBalance !== null && (
+                  <Link
+                    href="/credits"
+                    className="flex items-center gap-1.5 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-1.5 rounded-xl text-sm font-medium transition-colors"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    {creditBalance.toLocaleString()}
+                  </Link>
+                )}
                 <Link href="/dashboard" className="flex items-center gap-2">
                   <Avatar
                     src={user.avatar_url}

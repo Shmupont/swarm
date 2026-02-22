@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.marketplace.database import init_db, engine
-from src.marketplace.models import User, AgentProfile
+from src.marketplace.models import AgentProfile, CreditPack, User
 from src.marketplace.auth import hash_password
 from sqlmodel import Session, select
 
@@ -236,10 +236,41 @@ def seed():
             )
             session.add(agent)
 
+        # Seed credit packs
+        credit_packs = [
+            CreditPack(
+                name="Starter",
+                credits=500,
+                price_cents=499,
+                stripe_price_id="",
+                bonus_credits=0,
+                is_active=True,
+            ),
+            CreditPack(
+                name="Pro",
+                credits=2000,
+                price_cents=1499,
+                stripe_price_id="",
+                bonus_credits=0,
+                is_active=True,
+            ),
+            CreditPack(
+                name="Studio",
+                credits=10000,
+                price_cents=4999,
+                stripe_price_id="",
+                bonus_credits=0,
+                is_active=True,
+            ),
+        ]
+        for pack in credit_packs:
+            session.add(pack)
+
         session.commit()
-        print(f"Seeded 2 users and {len(DEMO_AGENTS)} agents.")
+        print(f"Seeded 2 users, {len(DEMO_AGENTS)} agents, and 3 credit packs.")
         print("Login: matt@swarm.app / password123")
         print("Login: sarah@swarm.app / password123")
+        print("Credit packs: Starter (500 cr, $4.99), Pro (2000 cr, $14.99), Studio (10000 cr, $49.99)")
 
 
 if __name__ == "__main__":

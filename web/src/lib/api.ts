@@ -763,3 +763,71 @@ export async function listMyLicenses(token: string) {
 export async function getLicenseUsage(token: string, licenseId: string) {
   return apiFetch<UsageStats>(`/licenses/${licenseId}/usage`, { token });
 }
+
+// ── Credits & Payments ────────────────────────────────────────
+
+export interface CreditPack {
+  id: string;
+  name: string;
+  credits: number;
+  price_cents: number;
+  bonus_credits: number;
+  total_credits: number;
+  stripe_price_id: string;
+}
+
+export interface CheckoutResponse {
+  checkout_url: string;
+  session_id: string;
+}
+
+export interface CreditBalance {
+  credit_balance: number;
+}
+
+export interface CreditPurchaseRecord {
+  id: string;
+  pack_id: string | null;
+  pack_name: string | null;
+  credits_granted: number;
+  amount_paid_cents: number;
+  status: "pending" | "completed" | "refunded";
+  created_at: string;
+}
+
+export interface CreatorEarningsEntry {
+  id: string;
+  agent_profile_id: string;
+  agent_name: string | null;
+  gross_credits: number;
+  platform_fee_credits: number;
+  net_credits: number;
+  created_at: string;
+}
+
+export async function getCreditPacks() {
+  return apiFetch<CreditPack[]>("/payments/credit-packs");
+}
+
+export async function createCreditCheckout(token: string, pack_id: string) {
+  return apiFetch<CheckoutResponse>("/payments/checkout", {
+    method: "POST",
+    body: JSON.stringify({ pack_id }),
+    token,
+  });
+}
+
+export async function getCreditBalance(token: string) {
+  return apiFetch<CreditBalance>("/payments/balance", { token });
+}
+
+export async function getCreditHistory(token: string, page = 1) {
+  return apiFetch<CreditPurchaseRecord[]>(`/payments/history?page=${page}`, { token });
+}
+
+export async function getCreatorEarnings(token: string) {
+  return apiFetch<{ earnings: CreatorEarningsEntry[]; total_net_credits: number }>(
+    "/payments/earnings",
+    { token }
+  );
+}

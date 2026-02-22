@@ -41,6 +41,8 @@ class User(SQLModel, table=True):
     password_hash: str
     display_name: str | None = None
     avatar_url: str | None = None
+    credit_balance: int = Field(default=0)
+    stripe_customer_id: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -97,6 +99,7 @@ class AgentProfile(SQLModel, table=True):
     response_time_hours: float | None = None
     tasks_completed: int = Field(default=0)
     total_earned_cents: int = Field(default=0)
+    total_earned_credits: int = Field(default=0)
 
     # Status — "docked" is the key concept
     is_docked: bool = Field(default=True)
@@ -332,7 +335,7 @@ class AgentPricingPlan(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
 
-    plan_type: str  # subscription, one_time, rental
+    plan_type: str  # subscription, one_time, rental, credits
     price_cents: int
     currency: str = Field(default="USD")
     billing_interval: str | None = None  # monthly, yearly
@@ -340,6 +343,11 @@ class AgentPricingPlan(SQLModel, table=True):
 
     max_messages_per_period: int | None = None
     max_tokens_per_period: int | None = None
+
+    # Credits pricing
+    credits_per_message: int | None = None
+    credits_per_1k_tokens: int | None = None
+    platform_fee_bps: int = Field(default=2000)  # 20% platform fee in basis points
 
     plan_name: str
     plan_description: str | None = None
@@ -372,6 +380,10 @@ class AgentLicense(SQLModel, table=True):
     period_tokens: int = Field(default=0)
     period_start: datetime = Field(default_factory=_utcnow)
 
+    # Credits tracking
+    credits_spent: int = Field(default=0)
+    creator_credits_earned: int = Field(default=0)
+
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
 
@@ -396,4 +408,58 @@ class ProxyUsageLog(SQLModel, table=True):
     success: bool = Field(default=True)
     error_message: str | None = None
 
+    # Credits tracking
+    credits_charged: int = Field(default=0)
+    creator_credits_earned: int = Field(default=0)
+    platform_fee_credits: int = Field(default=0)
+
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Credit Pack ──────────────────────────────────────────────
+
+
+class CreditPack(SQLModel, table=True):
+    __tablename__ = "credit_packs"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    name: str
+    credits: int
+    price_cents: int
+    stripe_price_id: str = Field(default="")
+    bonus_credits: int = Field(default=0)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Credit Purchase ──────────────────────────────────────────
+
+
+class CreditPurchase(SQLModel, table=True):
+    __tablename__ = "credit_purchases"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    pack_id: uuid.UUID | None = Field(default=None, foreign_key="credit_packs.id")
+    stripe_session_id: str = Field(unique=True, index=True)
+    stripe_payment_intent_id: str | None = None
+    credits_granted: int
+    amount_paid_cents: int
+    status: str = Field(default="pending")  # pending, completed, refunded
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Creator Earnings ─────────────────────────────────────────
+
+
+class CreatorEarnings(SQLModel, table=True):
+    __tablename__ = "creator_earnings"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    agent_profile_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    owner_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    proxy_usage_log_id: uuid.UUID = Field(foreign_key="proxy_usage_logs.id", index=True)
+    gross_credits: int
+    platform_fee_credits: int
+    net_credits: int
     created_at: datetime = Field(default_factory=_utcnow)
