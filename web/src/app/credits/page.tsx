@@ -144,7 +144,7 @@ export default function CreditsPage() {
                 </p>
                 <Button
                   className="w-full gap-2"
-                  variant={isPopular ? "default" : "ghost"}
+                  variant={isPopular ? "primary" : "ghost"}
                   onClick={() => handleBuy(pack.id)}
                   disabled={buying === pack.id}
                 >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, Zap } from "lucide-react";
@@ -9,7 +9,7 @@ import { getCreditBalance } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
-export default function CreditSuccessPage() {
+function CreditSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get("session_id");
@@ -21,7 +21,6 @@ export default function CreditSuccessPage() {
       return;
     }
     const token = getToken()!;
-    // Poll balance briefly — webhook may take a moment
     const fetchBalance = () =>
       getCreditBalance(token)
         .then((r) => setBalance(r.credit_balance))
@@ -79,5 +78,13 @@ export default function CreditSuccessPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function CreditSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><span className="text-muted">Loading…</span></div>}>
+      <CreditSuccessContent />
+    </Suspense>
   );
 }
