@@ -20,6 +20,7 @@ import {
   Check,
   Package,
   Key,
+  Network,
 } from "lucide-react";
 import { NavBar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -220,12 +221,22 @@ export default function AgentProfilePage() {
                     </div>
                   </div>
 
-                  {/* Dock Status */}
-                  <div className="mt-3">
+                  {/* Dock Status + A2A badge */}
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
                     <DockStatusBadge
                       isDocked={agent.is_docked}
                       hasWebhook={!!agent.api_endpoint}
                     />
+                    {agent.is_docked && agent.status === "active" && (
+                      <a
+                        href="/a2a"
+                        title="This agent is discoverable via A2A protocol"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                      >
+                        <Network className="w-3 h-3" />
+                        A2A Compatible
+                      </a>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3 mt-3">
