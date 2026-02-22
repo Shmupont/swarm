@@ -9,7 +9,7 @@ from sqlmodel import Session
 from ..database import get_engine
 from ..encryption import decrypt_api_key
 from ..licenses import validate_license
-from ..models import ProxyUsageLog
+from ..models import AgentProfile, CreatorEarnings, ProxyUsageLog, User
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,23 @@ async def proxy_messages(request: Request):
         agent = result["agent"]
         plan = result["plan"]
 
-        # 3. Decrypt creator's API key
+        # 3. Credit check — if plan uses credits billing
+        buyer: User | None = None
+        credits_to_charge = 0
+        if plan.plan_type == "credits" and plan.credits_per_message is not None:
+            buyer = session.get(User, license.buyer_id)
+            if not buyer:
+                return _error_response("authentication_error", "Buyer account not found", 403)
+            credits_to_charge = plan.credits_per_message
+            if buyer.credit_balance < credits_to_charge:
+                return _error_response(
+                    "payment_required",
+                    f"Insufficient credits. Need {credits_to_charge}, have {buyer.credit_balance}. "
+                    "Top up at /credits.",
+                    402,
+                )
+
+        # 4. Decrypt creator's API key
         if not agent.encrypted_api_key:
             return _error_response(
                 "invalid_request_error",
@@ -86,10 +102,10 @@ async def proxy_messages(request: Request):
                 500,
             )
 
-        # 4. Read raw request body
+        # 5. Read raw request body
         body = await request.body()
 
-        # 5. Build headers for Anthropic
+        # 6. Build headers for Anthropic
         forward_headers = {"x-api-key": real_api_key, "content-type": "application/json"}
         for header_name in PASS_THROUGH_HEADERS - {"content-type"}:
             val = request.headers.get(header_name)
@@ -98,7 +114,7 @@ async def proxy_messages(request: Request):
         if "anthropic-version" not in forward_headers:
             forward_headers["anthropic-version"] = "2023-06-01"
 
-        # 6. Forward to Anthropic
+        # 7. Forward to Anthropic
         start_time = time.time()
         input_tokens = 0
         output_tokens = 0
@@ -117,19 +133,21 @@ async def proxy_messages(request: Request):
         except httpx.TimeoutException:
             response_time_ms = int((time.time() - start_time) * 1000)
             _log_usage(
-                session, license, agent, "unknown", 0, 0, 0, 0, response_time_ms, False, "Upstream timeout"
+                session, license, agent, "unknown", 0, 0, 0, 0, response_time_ms, False,
+                "Upstream timeout", 0, 0, 0,
             )
             return _error_response("api_error", "Request timed out", 504)
         except Exception as e:
             response_time_ms = int((time.time() - start_time) * 1000)
             _log_usage(
-                session, license, agent, "unknown", 0, 0, 0, 0, response_time_ms, False, str(e)
+                session, license, agent, "unknown", 0, 0, 0, 0, response_time_ms, False,
+                str(e), 0, 0, 0,
             )
             return _error_response("api_error", "Failed to reach upstream API", 502)
 
         response_time_ms = int((time.time() - start_time) * 1000)
 
-        # 7. Parse response for usage tracking
+        # 8. Parse response for usage tracking
         if resp.status_code == 200:
             try:
                 resp_json = resp.json()
@@ -148,14 +166,91 @@ async def proxy_messages(request: Request):
             except Exception:
                 error_message = f"HTTP {resp.status_code}"
 
-        # 8. Log usage and update license counters
+        # 9. Credit deduction + creator earnings (atomic, only on success)
+        creator_credits_earned = 0
+        platform_fee_credits = 0
+        actual_credits_charged = 0
+
+        if success and plan.plan_type == "credits":
+            if credits_to_charge > 0 and buyer:
+                actual_credits_charged = credits_to_charge
+                platform_fee_credits = round(credits_to_charge * plan.platform_fee_bps / 10000)
+                creator_credits_earned = credits_to_charge - platform_fee_credits
+
+                # Deduct from buyer
+                buyer.credit_balance -= actual_credits_charged
+                session.add(buyer)
+
+                # Credit creator
+                creator = session.get(User, agent.owner_id)
+                if creator:
+                    creator.credit_balance += creator_credits_earned
+                    session.add(creator)
+
+                # Update agent total
+                agent_obj = session.get(AgentProfile, agent.id)
+                if agent_obj:
+                    agent_obj.total_earned_credits += creator_credits_earned
+                    session.add(agent_obj)
+
+                # Update license counters
+                license.credits_spent += actual_credits_charged
+                license.creator_credits_earned += creator_credits_earned
+                session.add(license)
+
+            elif plan.credits_per_1k_tokens and total_tokens > 0:
+                # Per-token billing
+                actual_credits_charged = round(
+                    (total_tokens / 1000) * plan.credits_per_1k_tokens
+                )
+                # Ensure buyer has balance (best-effort for per-token; was checked per-message)
+                if buyer and buyer.credit_balance >= actual_credits_charged:
+                    platform_fee_credits = round(
+                        actual_credits_charged * plan.platform_fee_bps / 10000
+                    )
+                    creator_credits_earned = actual_credits_charged - platform_fee_credits
+
+                    buyer.credit_balance -= actual_credits_charged
+                    session.add(buyer)
+
+                    creator = session.get(User, agent.owner_id)
+                    if creator:
+                        creator.credit_balance += creator_credits_earned
+                        session.add(creator)
+
+                    agent_obj = session.get(AgentProfile, agent.id)
+                    if agent_obj:
+                        agent_obj.total_earned_credits += creator_credits_earned
+                        session.add(agent_obj)
+
+                    license.credits_spent += actual_credits_charged
+                    license.creator_credits_earned += creator_credits_earned
+                    session.add(license)
+                else:
+                    actual_credits_charged = 0
+
+        # 10. Log usage and update license counters
         cost_cents = _estimate_cost_cents(model_used, input_tokens, output_tokens)
-        _log_usage(
+        log = _log_usage(
             session, license, agent, model_used, input_tokens, output_tokens,
             total_tokens, cost_cents, response_time_ms, success, error_message,
+            actual_credits_charged, creator_credits_earned, platform_fee_credits,
         )
 
-        # 9. Return Anthropic's raw response
+        # 11. Insert CreatorEarnings row if credits were earned
+        if creator_credits_earned > 0 and log is not None:
+            earnings = CreatorEarnings(
+                agent_profile_id=agent.id,
+                owner_id=agent.owner_id,
+                proxy_usage_log_id=log.id,
+                gross_credits=actual_credits_charged,
+                platform_fee_credits=platform_fee_credits,
+                net_credits=creator_credits_earned,
+            )
+            session.add(earnings)
+            session.commit()
+
+        # 12. Return Anthropic's raw response
         return Response(
             content=resp.content,
             status_code=resp.status_code,
@@ -175,7 +270,10 @@ def _log_usage(
     response_time_ms: int,
     success: bool,
     error_message: str | None,
-):
+    credits_charged: int = 0,
+    creator_credits_earned: int = 0,
+    platform_fee_credits: int = 0,
+) -> ProxyUsageLog | None:
     now = datetime.now(UTC).replace(tzinfo=None)
 
     log = ProxyUsageLog(
@@ -190,6 +288,9 @@ def _log_usage(
         response_time_ms=response_time_ms,
         success=success,
         error_message=error_message,
+        credits_charged=credits_charged,
+        creator_credits_earned=creator_credits_earned,
+        platform_fee_credits=platform_fee_credits,
     )
     session.add(log)
 
@@ -204,3 +305,5 @@ def _log_usage(
         session.add(license)
 
     session.commit()
+    session.refresh(log)
+    return log

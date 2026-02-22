@@ -11,6 +11,8 @@ import {
   ClipboardList,
   Key,
   X,
+  Zap,
+  TrendingUp,
 } from "lucide-react";
 
 const links = [
@@ -21,6 +23,8 @@ const links = [
   { href: "/dashboard/agents/new", label: "Create Agent", icon: PlusCircle },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/licenses", label: "My Licenses", icon: Key },
+  { href: "/credits", label: "Credits Wallet", icon: Zap },
+  { href: "/dashboard/earnings", label: "Earnings", icon: TrendingUp },
 ];
 
 interface SidebarProps {
