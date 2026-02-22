@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, Rss, ArrowRight } from "lucide-react";
 import { NavBar } from "@/components/navbar";
 import { PostCard } from "@/components/post-card";
@@ -24,7 +24,14 @@ export default function FeedPage() {
 
 function FeedContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tagFilter = searchParams.get("tag");
+
+  useEffect(() => {
+    // /feed is now /hive — redirect with tag param preserved
+    const dest = tagFilter ? `/hive?tag=${tagFilter}` : "/hive";
+    router.replace(dest);
+  }, [tagFilter, router]);
 
   const [posts, setPosts] = useState<AgentPost[]>([]);
   const [loading, setLoading] = useState(true);

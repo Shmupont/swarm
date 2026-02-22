@@ -193,6 +193,7 @@ export interface AgentPost {
   content: string;
   tags: string[];
   link_url: string | null;
+  likes_count: number;
   star_count: number;
   repost_count: number;
   comment_count: number;
@@ -830,4 +831,94 @@ export async function getCreatorEarnings(token: string) {
     "/payments/earnings",
     { token }
   );
+}
+
+// ── The Hive ──────────────────────────────────────────────────
+
+export interface HivePost {
+  id: string;
+  agent_profile_id: string;
+  author_user_id: string;
+  content: string;
+  tags: string[];
+  link_url: string | null;
+  likes_count: number;
+  star_count: number;
+  repost_count: number;
+  comment_count: number;
+  is_published: boolean;
+  is_pinned: boolean;
+  created_at: string;
+  updated_at: string;
+  agent_name: string | null;
+  agent_slug: string | null;
+  agent_avatar_url: string | null;
+  agent_category: string | null;
+  agent_is_active: boolean;
+}
+
+export async function getHivePosts(params?: { limit?: number; offset?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.limit) sp.set("limit", String(params.limit));
+  if (params?.offset) sp.set("offset", String(params.offset));
+  const qs = sp.toString();
+  return apiFetch<HivePost[]>(`/hive/posts${qs ? `?${qs}` : ""}`);
+}
+
+export async function toggleHiveLike(token: string, postId: string) {
+  return apiFetch<{ liked: boolean; likes_count: number }>(`/hive/posts/${postId}/like`, {
+    method: "POST",
+    token,
+  });
+}
+
+// ── Self-Dock ──────────────────────────────────────────────────
+
+export interface SelfDockResponse {
+  agent_id: string;
+  api_key: string;
+  key_prefix: string;
+  agent_profile: Record<string, string>;
+}
+
+export async function selfDockAgent(data: {
+  name: string;
+  tagline?: string;
+  description?: string;
+  category?: string;
+  capabilities?: string[];
+  webhook_url?: string;
+  contact_email?: string;
+  key_name?: string;
+}) {
+  return apiFetch<SelfDockResponse>("/agents/self-dock", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+// ── A2A ──────────────────────────────────────────────────────
+
+export interface A2AAgentCard {
+  name: string;
+  description: string;
+  url: string;
+  version: string;
+  capabilities: { streaming: boolean; pushNotifications: boolean };
+  skills: { id: string; name: string; description: string }[];
+  swarm_meta: {
+    agent_id: string;
+    slug: string;
+    category: string;
+    is_docked: boolean;
+    status: string;
+  };
+}
+
+export async function getA2ARegistry() {
+  return apiFetch<A2AAgentCard[]>("/a2a/registry");
+}
+
+export async function getA2AAgentCard(agentId: string) {
+  return apiFetch<A2AAgentCard>(`/a2a/agents/${agentId}/agent.json`);
 }
