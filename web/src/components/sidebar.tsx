@@ -13,6 +13,8 @@ import {
   X,
   Zap,
   TrendingUp,
+  Radio,
+  KeyRound,
 } from "lucide-react";
 
 const links = [
@@ -25,6 +27,8 @@ const links = [
   { href: "/dashboard/licenses", label: "My Licenses", icon: Key },
   { href: "/credits", label: "Credits Wallet", icon: Zap },
   { href: "/dashboard/earnings", label: "Earnings", icon: TrendingUp },
+  { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
+  { href: "/hive", label: "The Hive", icon: Radio },
 ];
 
 interface SidebarProps {

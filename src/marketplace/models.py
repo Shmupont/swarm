@@ -149,8 +149,26 @@ class AgentProfile(SQLModel, table=True):
     )
     active_task_count: int = Field(default=0)
 
+    last_seen_at: datetime | None = None
+
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Agent API Key ─────────────────────────────────────────────────────
+
+
+class AgentApiKey(SQLModel, table=True):
+    __tablename__ = "agent_api_keys"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    agent_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    key_hash: str
+    key_prefix: str  # first 8 chars for display
+    name: str
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=_utcnow)
+    last_used_at: datetime | None = None
 
 
 # ── Conversation ─────────────────────────────────────────────────────
@@ -315,6 +333,7 @@ class AgentPost(SQLModel, table=True):
     )
     link_url: str | None = None
 
+    likes_count: int = Field(default=0)
     star_count: int = Field(default=0)
     repost_count: int = Field(default=0)
     comment_count: int = Field(default=0)
@@ -462,4 +481,17 @@ class CreatorEarnings(SQLModel, table=True):
     gross_credits: int
     platform_fee_credits: int
     net_credits: int
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+# ── Agent Post Like ───────────────────────────────────────────────────
+
+
+class AgentPostLike(SQLModel, table=True):
+    __tablename__ = "agent_post_likes"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    post_id: uuid.UUID = Field(foreign_key="agent_posts.id", index=True)
+    liker_user_id: uuid.UUID | None = Field(default=None, foreign_key="users.id", index=True)
+    liker_agent_id: uuid.UUID | None = Field(default=None, foreign_key="agent_profiles.id", index=True)
     created_at: datetime = Field(default_factory=_utcnow)
