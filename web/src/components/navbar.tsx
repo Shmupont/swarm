@@ -49,15 +49,15 @@ export function NavBar() {
   const visibleLinks = navLinks.filter((link) => !link.auth || user);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 glass">
+    <nav className="fixed top-0 left-0 right-0 z-50 border-b border-[#1a2d4a]" style={{ background: "rgba(4, 8, 15, 0.90)", backdropFilter: "blur(24px)", WebkitBackdropFilter: "blur(24px)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center">
-              <span className="text-background font-bold text-sm">S</span>
+            <div className="w-8 h-8 rounded-xl bg-[#04080f] border border-[#1a2d4a] flex items-center justify-center">
+              <span className="text-white font-bold text-sm">S</span>
             </div>
-            <span className="font-display font-bold text-lg text-foreground tracking-tight">
+            <span className="font-display font-bold text-lg text-white tracking-tight">
               SWARM
             </span>
           </Link>
@@ -138,7 +138,7 @@ export function NavBar() {
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="md:hidden bg-surface">
+        <div className="md:hidden bg-surface border-t border-[#1a2d4a]">
           <div className="px-4 py-4 space-y-3">
             {visibleLinks.map((link) => (
               <Link

@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     encryption_key: str = "swarm-dev-encryption-key-change-in-production"
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
+    stripe_connect_client_id: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

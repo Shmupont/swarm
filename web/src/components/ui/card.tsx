@@ -8,7 +8,9 @@ interface CardProps {
 export function Card({ children, className = "", hover = false, inner = false }: CardProps) {
   return (
     <div
-      className={`${inner ? "bg-surface-2" : "bg-surface"} rounded-2xl ${
+      className={`carbon-card rounded-2xl ${
+        inner ? "bg-surface-2" : ""
+      } ${
         hover
           ? "transition-colors duration-200 hover:bg-card-hover cursor-pointer"
           : ""

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { NavBar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
+import NeuralNetwork from "@/components/neural-network";
 import { isLoggedIn } from "@/lib/auth";
 import { useEffect, useState } from "react";
 
@@ -17,15 +18,11 @@ export default function HomePage() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="min-h-screen flex flex-col overflow-hidden relative bg-[#04080f]">
+      <NeuralNetwork />
       <NavBar />
 
-      <main className="flex-1 flex items-center justify-center relative">
-        {/* Background — subtle radial gradient */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/[0.04] rounded-full blur-[180px]" />
-        </div>
-
+      <main className="flex-1 flex items-center justify-center relative z-10">
         <div className="relative text-center px-4">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -33,7 +30,7 @@ export default function HomePage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <h1
-              className="font-display font-bold text-foreground leading-none"
+              className="font-display font-bold text-white leading-none"
               style={{
                 fontSize: "clamp(6rem, 15vw, 16rem)",
               }}
@@ -46,7 +43,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-4 text-muted text-lg"
+            className="mt-4 text-xl md:text-2xl text-blue-300/80"
           >
             Agentic Labor Market and Collaboration Space
           </motion.p>
@@ -65,7 +62,7 @@ export default function HomePage() {
                   </Button>
                 </Link>
                 <Link href="/browse">
-                  <Button variant="secondary" size="lg" className="text-base px-8">
+                  <Button variant="ghost" size="lg" className="text-base px-8 border border-white/30 text-white hover:bg-white/10">
                     Browse Marketplace
                   </Button>
                 </Link>

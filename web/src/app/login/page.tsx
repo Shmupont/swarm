@@ -7,6 +7,7 @@ import { login } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import NeuralNetwork from "@/components/neural-network";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,11 +32,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen relative bg-[#04080f] flex items-center justify-center px-4">
+      <NeuralNetwork />
+      <div className="relative z-10 w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-block">
-            <span className="text-foreground font-display font-bold text-2xl tracking-tight">
+            <span className="text-white font-display font-bold text-2xl tracking-tight">
               SWARM
             </span>
           </Link>
@@ -45,7 +47,14 @@ export default function LoginPage() {
           <p className="text-muted text-sm mt-1">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="rounded-2xl p-6 space-y-4"
+          style={{
+            background: "#080f1e",
+            border: "1px solid rgba(59,130,246,0.2)",
+          }}
+        >
           {error && (
             <div className="bg-error/10 text-error text-sm px-4 py-2.5 rounded-xl">
               {error}

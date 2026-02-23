@@ -5,28 +5,30 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /* ── Background Layers (warm dark blue-grey, Safari-inspired) ── */
-        background: "#1C1C1E",
-        surface: "#2C2C2E",
-        "surface-2": "#3A3A3C",
-        "surface-3": "#48484A",
-        elevated: "#48484A",
-        "card-hover": "#333335",
+        /* ── Background Layers (deep navy) ── */
+        background: "#04080f",
+        surface: "#080f1e",
+        "surface-2": "#0d1829",
+        "surface-3": "#111f38",
+        elevated: "#111f38",
+        "card-hover": "#0d1829",
 
-        /* ── Accent — Red/Amber ── */
-        accent: "#F97316",
-        "accent-muted": "rgba(249, 115, 22, 0.12)",
-        "accent-hover": "#FB923C",
-        "accent-soft": "rgba(249, 115, 22, 0.12)",
+        /* ── Accent — Blue ── */
+        accent: "#3b82f6",
+        "accent-muted": "rgba(59, 130, 246, 0.12)",
+        "accent-hover": "#60a5fa",
+        "accent-soft": "rgba(59, 130, 246, 0.12)",
+        "accent-bright": "#60a5fa",
+        "accent-dim": "#1d4ed8",
 
         /* ── Text ── */
-        foreground: "#F5F5F7",
-        muted: "#A1A1A6",
-        "muted-2": "#6E6E73",
+        foreground: "#f0f4ff",
+        muted: "#7a90a8",
+        "muted-2": "#4a6070",
 
-        /* ── Borders (very subtle, used sparingly) ── */
-        border: "rgba(255, 255, 255, 0.06)",
-        "border-hover": "rgba(255, 255, 255, 0.1)",
+        /* ── Borders ── */
+        border: "#1a2d4a",
+        "border-hover": "rgba(59, 130, 246, 0.3)",
 
         /* ── Semantic ── */
         success: "#30D158",
@@ -35,8 +37,8 @@ const config: Config = {
         info: "#64D2FF",
 
         /* keep secondary for compat */
-        secondary: "#EF4444",
-        "secondary-muted": "rgba(239, 68, 68, 0.12)",
+        secondary: "#3b82f6",
+        "secondary-muted": "rgba(59, 130, 246, 0.12)",
       },
       fontFamily: {
         display: ["Clash Display", "system-ui", "sans-serif"],
@@ -47,14 +49,14 @@ const config: Config = {
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-accent":
-          "linear-gradient(135deg, #F97316 0%, #EF4444 100%)",
+          "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
       },
       borderRadius: {
-        "squircle": "22%",
+        squircle: "22%",
       },
       boxShadow: {
-        card: "0 2px 12px rgba(0, 0, 0, 0.2)",
-        elevated: "0 4px 24px rgba(0, 0, 0, 0.3)",
+        card: "0 2px 12px rgba(0, 0, 0, 0.4)",
+        elevated: "0 4px 24px rgba(0, 0, 0, 0.6)",
       },
     },
   },

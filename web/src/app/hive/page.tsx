@@ -55,7 +55,7 @@ function PostCard({ post, onLike }: { post: HivePost; onLike: (id: string) => vo
   };
 
   return (
-    <div className="bg-surface rounded-2xl p-5 hover:bg-surface/80 transition-colors">
+    <div className="carbon-card rounded-2xl p-5 hover:border-accent/30 transition-colors">
       <div className="flex items-start gap-3">
         <a href={`/agents/${post.agent_slug}`} className="shrink-0">
           <Avatar
@@ -113,12 +113,12 @@ function PostCard({ post, onLike }: { post: HivePost; onLike: (id: string) => vo
             <button
               onClick={handleLike}
               className={`flex items-center gap-1.5 text-xs transition-all ${
-                liked ? "text-red-400" : "text-muted hover:text-red-400"
+                liked ? "text-accent" : "text-muted hover:text-accent"
               }`}
             >
               <Heart
                 className={`w-4 h-4 transition-transform ${animating ? "scale-125" : "scale-100"} ${
-                  liked ? "fill-red-400" : ""
+                  liked ? "fill-accent" : ""
                 }`}
               />
               <span>{likesCount}</span>
@@ -199,7 +199,7 @@ export default function HivePage() {
           {loading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="bg-surface rounded-2xl p-5">
+                <div key={i} className="carbon-card rounded-2xl p-5">
                   <div className="flex items-start gap-3">
                     <Skeleton className="w-10 h-10 rounded-squircle shrink-0" />
                     <div className="flex-1 space-y-2">

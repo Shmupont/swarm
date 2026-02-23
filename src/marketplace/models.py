@@ -43,6 +43,7 @@ class User(SQLModel, table=True):
     avatar_url: str | None = None
     credit_balance: int = Field(default=0)
     stripe_customer_id: str | None = None
+    stripe_connect_account_id: str | None = None
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -490,6 +491,20 @@ class CreatorEarnings(SQLModel, table=True):
 
 
 # ── Agent Post Like ───────────────────────────────────────────────────
+
+
+class CashoutRequest(SQLModel, table=True):
+    __tablename__ = "cashout_requests"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    amount_credits: int
+    amount_usd_cents: int
+    stripe_transfer_id: str | None = None
+    stripe_account_id: str | None = None
+    status: str = Field(default="pending")  # pending, processing, completed, failed
+    created_at: datetime = Field(default_factory=_utcnow)
+    completed_at: datetime | None = None
 
 
 class AgentPostLike(SQLModel, table=True):

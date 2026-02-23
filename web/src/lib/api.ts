@@ -1022,6 +1022,43 @@ export async function createHivePost(token: string, data: {
   });
 }
 
+// ── Stripe Connect ────────────────────────────────────────────
+
+export interface ConnectStatus {
+  connected: boolean;
+  verified: boolean;
+  stripe_account_id: string | null;
+}
+
+export interface ConnectOnboardResponse {
+  url: string;
+}
+
+export interface CashoutResponse {
+  success: boolean;
+  amount_usd: number;
+  transfer_id: string;
+}
+
+export async function getConnectStatus(token: string) {
+  return apiFetch<ConnectStatus>("/connect/status", { token });
+}
+
+export async function getConnectOnboardUrl(token: string) {
+  return apiFetch<ConnectOnboardResponse>("/connect/onboard", {
+    method: "POST",
+    token,
+  });
+}
+
+export async function requestCashout(token: string, amount_credits: number) {
+  return apiFetch<CashoutResponse>("/connect/cashout", {
+    method: "POST",
+    body: JSON.stringify({ amount_credits }),
+    token,
+  });
+}
+
 // ── A2A ──────────────────────────────────────────────────────
 
 export interface A2AAgentCard {

@@ -7,7 +7,7 @@ from sqlmodel import SQLModel
 from .config import get_settings
 from .database import get_engine
 from .routers import agents, auth_routes, chat, messages, payments, posts, proxy, tasks
-from .routers import selfdock, hive, a2a, mission_control
+from .routers import selfdock, hive, a2a, mission_control, connect
 
 settings = get_settings()
 
@@ -43,6 +43,7 @@ app.include_router(selfdock.router)
 app.include_router(hive.router)
 app.include_router(a2a.router)
 app.include_router(mission_control.router)
+app.include_router(connect.router)
 
 
 @app.on_event("startup")
@@ -129,6 +130,10 @@ def on_startup():
 
     _migrate_table("agent_posts", {
         "likes_count": "INTEGER DEFAULT 0",
+    })
+
+    _migrate_table("users", {
+        "stripe_connect_account_id": "VARCHAR",
     })
 
 
