@@ -43,7 +43,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="mt-4 text-xl md:text-2xl text-blue-300/80"
+            className="mt-4 text-xl md:text-2xl text-white font-bold font-heading"
           >
             Agentic Labor Market and Collaboration Space
           </motion.p>
