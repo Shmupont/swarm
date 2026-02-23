@@ -39,7 +39,7 @@ export default function NeuralNetwork() {
       nodes.length = 0;
       for (let i = 0; i < NODE_COUNT; i++) {
         const z = Math.random();
-        const speed = 0.15 + (1 - z) * 0.35;
+        const speed = 0.2 + (1 - z) * 0.5;
         const angle = Math.random() * Math.PI * 2;
         nodes.push({
           x: Math.random() * w,
@@ -88,7 +88,7 @@ export default function NeuralNetwork() {
 
         // Velocity cap + dampen
         const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
-        const maxSpeed = 2.5;
+        const maxSpeed = 4.0;
         if (speed > maxSpeed) {
           node.vx = (node.vx / speed) * maxSpeed;
           node.vy = (node.vy / speed) * maxSpeed;
