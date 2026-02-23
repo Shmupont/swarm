@@ -276,7 +276,7 @@ export default function AgentProfilePage() {
                         <Button onClick={() => setActiveTab("about")} className="gap-2">
                           <Package className="w-4 h-4" /> Get Access
                         </Button>
-                      ) : agent.is_chat_ready ? (
+                      ) : (
                         <div className="flex flex-col items-end gap-1">
                           {agent.price_per_message_credits > 0 && (
                             <p className="text-sm text-muted">
@@ -316,18 +316,6 @@ export default function AgentProfilePage() {
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <>
-                          {agent.is_docked && agent.api_endpoint ? (
-                            <Button onClick={handleSendTask} className="gap-2">
-                              <Send className="w-4 h-4" /> Send Task
-                            </Button>
-                          ) : (
-                            <Button onClick={handleContact} className="gap-2">
-                              <MessageSquare className="w-4 h-4" /> Message
-                            </Button>
-                          )}
-                        </>
                       )}
                     </div>
                   </div>
@@ -397,7 +385,7 @@ export default function AgentProfilePage() {
               </div>
 
               {/* Inline Trial Chat Panel */}
-              {trialOpen && agent.is_chat_ready && (
+              {trialOpen && (
                 <div className="mt-6 border border-accent/20 rounded-2xl overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 bg-accent/5 border-b border-accent/20">
                     <div>
@@ -689,53 +677,39 @@ export default function AgentProfilePage() {
 
                   {agent.listing_type !== "openclaw" && (
                     <>
-                      {agent.is_chat_ready ? (
-                        <div className="space-y-2">
-                          {agent.price_per_message_credits > 0 && (
-                            <p className="text-center">
-                              <span className="text-accent font-bold text-lg">⚡ {agent.price_per_message_credits}</span>
-                              <span className="text-muted text-sm ml-1">credits / message</span>
-                            </p>
-                          )}
-                          {hasLicense ? (
-                            <Button onClick={handleChat} className="w-full gap-2">
-                              <Bot className="w-4 h-4" /> Continue Chatting →
+                      <div className="space-y-2">
+                        {agent.price_per_message_credits > 0 && (
+                          <p className="text-center">
+                            <span className="text-accent font-bold text-lg">⚡ {agent.price_per_message_credits}</span>
+                            <span className="text-muted text-sm ml-1">credits / message</span>
+                          </p>
+                        )}
+                        {hasLicense ? (
+                          <Button onClick={handleChat} className="w-full gap-2">
+                            <Bot className="w-4 h-4" /> Continue Chatting →
+                          </Button>
+                        ) : (
+                          <>
+                            <Button onClick={handleHire} disabled={hiring} className="w-full gap-2">
+                              <Bot className="w-4 h-4" />
+                              {hiring ? "Processing..." : agent.price_per_message_credits === 0 ? "Chat Free →" : "Hire Agent →"}
                             </Button>
-                          ) : (
-                            <>
-                              <Button onClick={handleHire} disabled={hiring} className="w-full gap-2">
-                                <Bot className="w-4 h-4" />
-                                {hiring ? "Processing..." : agent.price_per_message_credits === 0 ? "Chat Free →" : "Hire Agent →"}
+                            <div className="flex items-center gap-2 my-1">
+                              <div className="h-px bg-border flex-1" />
+                              <span className="text-xs text-muted">or</span>
+                              <div className="h-px bg-border flex-1" />
+                            </div>
+                            {trialExhausted ? (
+                              <p className="text-xs text-muted text-center">You&apos;ve used your 3 free messages</p>
+                            ) : (
+                              <Button variant="ghost" onClick={handleTryFree} className="w-full">
+                                Try 3 Free Messages
                               </Button>
-                              <div className="flex items-center gap-2 my-1">
-                                <div className="h-px bg-border flex-1" />
-                                <span className="text-xs text-muted">or</span>
-                                <div className="h-px bg-border flex-1" />
-                              </div>
-                              {trialExhausted ? (
-                                <p className="text-xs text-muted text-center">You&apos;ve used your 3 free messages</p>
-                              ) : (
-                                <Button variant="ghost" onClick={handleTryFree} className="w-full">
-                                  Try 3 Free Messages
-                                </Button>
-                              )}
-                              <p className="text-xs text-muted text-center">No credits needed</p>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          {agent.is_docked && agent.api_endpoint ? (
-                            <Button onClick={handleSendTask} className="w-full gap-2">
-                              <Send className="w-4 h-4" /> Send Task
-                            </Button>
-                          ) : (
-                            <Button onClick={handleContact} className="w-full gap-2">
-                              <MessageSquare className="w-4 h-4" /> Contact Agent
-                            </Button>
-                          )}
-                        </>
-                      )}
+                            )}
+                            <p className="text-xs text-muted text-center">No credits needed</p>
+                          </>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
