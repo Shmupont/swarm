@@ -9,6 +9,8 @@ interface Node {
   vy: number;
   radius: number;
   opacity: number;
+  hue: number;
+  hueSpeed: number;
 }
 
 export default function NeuralNetwork() {
@@ -24,10 +26,12 @@ export default function NeuralNetwork() {
     let animationId: number;
     let mouseX = -9999;
     let mouseY = -9999;
-    const NODE_COUNT = 80;
-    const CONNECTION_DIST = 150;
-    const MOUSE_ATTRACT_DIST = 200;
-    const MOUSE_FORCE = 0.012;
+
+    const NODE_COUNT = 180;
+    const CONNECTION_DIST = 180;
+    const MOUSE_ATTRACT_DIST = 250;
+    const MOUSE_FORCE = 0.018;
+    const MOUSE_REPEL_DIST = 60; // nodes too close get gently pushed away
 
     const nodes: Node[] = [];
 
@@ -35,7 +39,7 @@ export default function NeuralNetwork() {
       nodes.length = 0;
       for (let i = 0; i < NODE_COUNT; i++) {
         const z = Math.random();
-        const speed = 0.2 + (1 - z) * 0.3;
+        const speed = 0.15 + (1 - z) * 0.35;
         const angle = Math.random() * Math.PI * 2;
         nodes.push({
           x: Math.random() * w,
@@ -43,8 +47,10 @@ export default function NeuralNetwork() {
           z,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          radius: 1.5 + z * 2,
-          opacity: 0.3 + z * 0.6,
+          radius: 1.5 + z * 2.5,
+          opacity: 0.4 + z * 0.6,
+          hue: Math.random() * 360,
+          hueSpeed: (Math.random() - 0.5) * 0.6, // slow color drift
         });
       }
     }
@@ -60,21 +66,35 @@ export default function NeuralNetwork() {
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
 
-      // Update positions
       for (const node of nodes) {
-        // Mouse attraction
+        // Drift hue
+        node.hue = (node.hue + node.hueSpeed + 360) % 360;
+
         const dx = mouseX - node.x;
         const dy = mouseY - node.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < MOUSE_ATTRACT_DIST && dist > 0) {
+
+        if (dist < MOUSE_REPEL_DIST && dist > 0) {
+          // Push away when very close
+          const force = (1 - dist / MOUSE_REPEL_DIST) * 0.04;
+          node.vx -= (dx / dist) * force;
+          node.vy -= (dy / dist) * force;
+        } else if (dist < MOUSE_ATTRACT_DIST && dist > 0) {
+          // Attract from medium range
           const force = (1 - dist / MOUSE_ATTRACT_DIST) * MOUSE_FORCE;
           node.vx += (dx / dist) * force;
           node.vy += (dy / dist) * force;
         }
 
-        // Dampen velocity
-        node.vx *= 0.995;
-        node.vy *= 0.995;
+        // Velocity cap + dampen
+        const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
+        const maxSpeed = 2.5;
+        if (speed > maxSpeed) {
+          node.vx = (node.vx / speed) * maxSpeed;
+          node.vy = (node.vy / speed) * maxSpeed;
+        }
+        node.vx *= 0.994;
+        node.vy *= 0.994;
 
         node.x += node.vx;
         node.y += node.vy;
@@ -95,13 +115,19 @@ export default function NeuralNetwork() {
           const dy = a.y - b.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < CONNECTION_DIST) {
-            const alpha = (1 - dist / CONNECTION_DIST) * 0.3;
+            const alpha = (1 - dist / CONNECTION_DIST) * 0.45;
+            // Blend hues of the two nodes for the line color
+            const avgHue = (a.hue + b.hue) / 2;
+            const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+            gradient.addColorStop(0, `hsla(${a.hue}, 100%, 70%, ${alpha})`);
+            gradient.addColorStop(1, `hsla(${b.hue}, 100%, 70%, ${alpha})`);
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = 0.5;
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = 0.6 + (1 - dist / CONNECTION_DIST) * 0.6;
             ctx.stroke();
+            void avgHue;
           }
         }
       }
@@ -112,13 +138,23 @@ export default function NeuralNetwork() {
         const dy = mouseY - node.y;
         const mouseDist = Math.sqrt(dx * dx + dy * dy);
         const mouseBoost = mouseDist < MOUSE_ATTRACT_DIST
-          ? (1 - mouseDist / MOUSE_ATTRACT_DIST) * 0.4
+          ? (1 - mouseDist / MOUSE_ATTRACT_DIST) * 0.5
           : 0;
 
         const opacity = Math.min(1, node.opacity + mouseBoost);
+        const radius = node.radius + (mouseBoost * 2);
+
+        // Glow effect for nodes near cursor
+        if (mouseBoost > 0.1) {
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, radius * 3, 0, Math.PI * 2);
+          ctx.fillStyle = `hsla(${node.hue}, 100%, 70%, ${mouseBoost * 0.15})`;
+          ctx.fill();
+        }
+
         ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${node.hue}, 100%, 75%, ${opacity})`;
         ctx.fill();
       }
 
