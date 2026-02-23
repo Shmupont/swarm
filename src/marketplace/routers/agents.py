@@ -56,7 +56,7 @@ def _enrich(profile: AgentProfile, session: Session) -> AgentResponse:
     resp = AgentResponse.model_validate(profile)
     owner = session.get(User, profile.owner_id)
     resp.owner_display_name = (owner.display_name or owner.email) if owner else None
-    resp.is_chat_ready = bool(profile.system_prompt and profile.has_api_key)
+    resp.is_chat_ready = bool((profile.system_prompt or profile.openai_assistant_id) and profile.has_api_key)
     resp.is_free = profile.is_free
     resp.price_per_conversation_cents = profile.price_per_conversation_cents
     resp.price_per_message_cents = profile.price_per_message_cents
@@ -437,6 +437,7 @@ def get_agent_config(
         price_per_message_credits=agent.price_per_message_credits,
         has_api_key=agent.has_api_key,
         api_key_preview=agent.api_key_preview,
+        openai_assistant_id=agent.openai_assistant_id,
     )
 
 
@@ -469,6 +470,9 @@ def update_agent_config(
         agent.encrypted_api_key = encrypt_api_key(data.api_key.strip())
         agent.api_key_preview = mask_api_key(data.api_key.strip())
         agent.has_api_key = True
+    if data.openai_assistant_id is not None:
+        # Allow setting to "" to clear it
+        agent.openai_assistant_id = data.openai_assistant_id.strip() or None
 
     agent.updated_at = datetime.now(UTC).replace(tzinfo=None)
     session.add(agent)
@@ -483,6 +487,7 @@ def update_agent_config(
         price_per_message_credits=agent.price_per_message_credits,
         has_api_key=agent.has_api_key,
         api_key_preview=agent.api_key_preview,
+        openai_assistant_id=agent.openai_assistant_id,
     )
 
 

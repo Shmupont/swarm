@@ -132,6 +132,7 @@ export interface AgentConfig {
   price_per_message_credits: number;
   has_api_key: boolean;
   api_key_preview: string | null;
+  openai_assistant_id: string | null;
 }
 
 export interface AgentConfigUpdate {
@@ -141,6 +142,7 @@ export interface AgentConfigUpdate {
   llm_provider?: string;
   price_per_message_credits?: number;
   api_key?: string;
+  openai_assistant_id?: string | null;
 }
 
 export interface HireResponse {

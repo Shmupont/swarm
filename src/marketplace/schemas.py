@@ -374,6 +374,7 @@ class AgentConfigUpdateRequest(BaseModel):
     llm_provider: str | None = None
     price_per_message_credits: int | None = None
     api_key: str | None = None  # if provided, encrypt and store
+    openai_assistant_id: str | None = None
 
 
 class AgentConfigResponse(BaseModel):
@@ -384,6 +385,7 @@ class AgentConfigResponse(BaseModel):
     price_per_message_credits: int = 0
     has_api_key: bool = False
     api_key_preview: str | None = None
+    openai_assistant_id: str | None = None
 
 
 # ── Hire Flow ─────────────────────────────────────────────────

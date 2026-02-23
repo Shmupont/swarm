@@ -1,3 +1,4 @@
+import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,6 +6,7 @@ from sqlmodel import Session, select
 
 from ..auth import get_current_user
 from ..database import get_session
+from ..encryption import decrypt_api_key
 from ..models import AgentLicense, AgentProfile, AgentSession, AgentChatMessage, User, _utcnow
 from ..schemas import (
     SessionResponse,
@@ -13,6 +15,74 @@ from ..schemas import (
     ChatResponse,
 )
 from ..llm import call_agent
+
+
+def _call_openai_assistant(
+    api_key: str,
+    assistant_id: str,
+    chat_session: AgentSession,
+    db_session: Session,
+    message: str,
+) -> dict:
+    """Call OpenAI Assistants API, managing thread persistence on the session."""
+    try:
+        import openai
+    except ImportError:
+        raise HTTPException(502, "openai package not installed")
+
+    client = openai.OpenAI(api_key=api_key)
+
+    # Create or reuse thread
+    if not chat_session.openai_thread_id:
+        thread = client.beta.threads.create()
+        chat_session.openai_thread_id = thread.id
+        db_session.add(chat_session)
+        db_session.flush()
+
+    thread_id = chat_session.openai_thread_id
+
+    # Add user message to thread
+    client.beta.threads.messages.create(
+        thread_id=thread_id,
+        role="user",
+        content=message,
+    )
+
+    # Create a run
+    run = client.beta.threads.runs.create(
+        thread_id=thread_id,
+        assistant_id=assistant_id,
+    )
+
+    # Poll until complete (30s timeout)
+    deadline = time.time() + 30
+    while run.status in ("queued", "in_progress", "cancelling"):
+        if time.time() > deadline:
+            raise HTTPException(504, "Assistant timed out")
+        time.sleep(0.5)
+        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+
+    if run.status == "failed":
+        detail = run.last_error.message if run.last_error else "Run failed"
+        raise HTTPException(500, f"Assistant run failed: {detail}")
+    if run.status in ("expired", "cancelled"):
+        raise HTTPException(500, f"Assistant run {run.status}")
+    if run.status != "completed":
+        raise HTTPException(502, f"Unexpected run status: {run.status}")
+
+    # Retrieve latest assistant message
+    messages_page = client.beta.threads.messages.list(
+        thread_id=thread_id, order="desc", limit=1
+    )
+    for msg in messages_page.data:
+        if msg.role == "assistant":
+            text = ""
+            for block in msg.content:
+                if block.type == "text":
+                    text += block.text.value
+            return {"content": text, "tokens_used": 0, "model": f"assistant:{assistant_id}"}
+
+    raise HTTPException(502, "No assistant message found in thread")
 
 router = APIRouter(tags=["chat"])
 
@@ -56,7 +126,9 @@ def start_session(
     ).first()
     if not agent:
         raise HTTPException(404, "Agent not found")
-    if not agent.system_prompt or not agent.has_api_key or not agent.encrypted_api_key:
+    if not agent.has_api_key or not agent.encrypted_api_key:
+        raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
+    if not agent.system_prompt and not agent.openai_assistant_id:
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
 
     # Check active license
@@ -108,7 +180,9 @@ def send_message(
         raise HTTPException(400, "Session is closed")
 
     agent = session.get(AgentProfile, chat_session.agent_profile_id)
-    if not agent or not agent.encrypted_api_key or not agent.system_prompt:
+    if not agent or not agent.encrypted_api_key:
+        raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
+    if not agent.system_prompt and not agent.openai_assistant_id:
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
 
     # License check
@@ -156,14 +230,27 @@ def send_message(
     messages = [{"role": msg.role, "content": msg.content} for msg in history]
 
     try:
-        result = call_agent(
-            encrypted_api_key=agent.encrypted_api_key,
-            system_prompt=agent.system_prompt,
-            messages=messages,
-            model=agent.llm_model,
-            temperature=agent.temperature,
-            max_tokens=agent.max_tokens,
-        )
+        if agent.openai_assistant_id and agent.llm_provider == "openai":
+            decrypted_key = decrypt_api_key(agent.encrypted_api_key)
+            result = _call_openai_assistant(
+                api_key=decrypted_key,
+                assistant_id=agent.openai_assistant_id,
+                chat_session=chat_session,
+                db_session=session,
+                message=data.content,
+            )
+        else:
+            result = call_agent(
+                encrypted_api_key=agent.encrypted_api_key,
+                system_prompt=agent.system_prompt or "",
+                messages=messages,
+                model=agent.llm_model,
+                temperature=agent.temperature,
+                max_tokens=agent.max_tokens,
+            )
+    except HTTPException:
+        session.commit()
+        raise
     except Exception as e:
         session.commit()
         raise HTTPException(502, f"Agent failed to respond: {str(e)}")

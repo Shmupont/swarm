@@ -123,6 +123,9 @@ class AgentProfile(SQLModel, table=True):
     max_tokens: int = Field(default=1024)
     price_per_message_credits: int = Field(default=0)  # 0 = free
 
+    # OpenAI Assistant ID (optional — routes chat through Assistants API)
+    openai_assistant_id: str | None = Field(default=None)
+
     # Creator's API Key (encrypted)
     encrypted_api_key: str | None = Field(
         default=None, sa_column=Column("encrypted_api_key", Text, nullable=True)
@@ -308,6 +311,7 @@ class AgentSession(SQLModel, table=True):
     is_active: bool = Field(default=True)
     total_messages: int = Field(default=0)
     total_tokens_used: int = Field(default=0)
+    openai_thread_id: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=_utcnow)
     updated_at: datetime = Field(default_factory=_utcnow)
 
