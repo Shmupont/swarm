@@ -44,6 +44,8 @@ class User(SQLModel, table=True):
     credit_balance: int = Field(default=0)
     stripe_customer_id: str | None = None
     stripe_connect_account_id: str | None = None
+    user_type: str | None = Field(default=None)  # 'creator' | 'user' | null
+    onboarding_completed: bool = Field(default=False)
     created_at: datetime = Field(default_factory=_utcnow)
 
 
@@ -505,6 +507,17 @@ class CashoutRequest(SQLModel, table=True):
     status: str = Field(default="pending")  # pending, processing, completed, failed
     created_at: datetime = Field(default_factory=_utcnow)
     completed_at: datetime | None = None
+
+
+class TrialSession(SQLModel, table=True):
+    __tablename__ = "trial_sessions"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="users.id", index=True)
+    agent_id: uuid.UUID = Field(foreign_key="agent_profiles.id", index=True)
+    messages_used: int = Field(default=0)
+    max_messages: int = Field(default=3)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class AgentPostLike(SQLModel, table=True):

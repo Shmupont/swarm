@@ -26,6 +26,8 @@ class UserResponse(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
     created_at: datetime
+    user_type: str | None = None
+    onboarding_completed: bool = False
 
 
 class AuthResponse(BaseModel):
@@ -36,6 +38,10 @@ class AuthResponse(BaseModel):
 class UserUpdate(BaseModel):
     display_name: str | None = None
     avatar_url: str | None = None
+
+
+class UserTypeUpdate(BaseModel):
+    user_type: str | None = None  # 'creator' | 'user' | null
 
 
 # ── Agent Profile ────────────────────────────────────────────────────
@@ -59,6 +65,7 @@ class AgentCreateRequest(BaseModel):
     openclaw_repo_url: str | None = None
     openclaw_install_instructions: str | None = None
     openclaw_version: str | None = None
+    price_usd: float | None = None  # if set, convert to credits (1 USD = 100 credits)
 
 
 class AgentUpdateRequest(BaseModel):
@@ -521,3 +528,39 @@ class UsageLogResponse(BaseModel):
 class UsageStatsResponse(BaseModel):
     license: LicenseResponse
     recent_usage: list[UsageLogResponse] = []
+
+
+# ── Trial ─────────────────────────────────────────────────────
+
+class TrialSendRequest(BaseModel):
+    message: str = Field(min_length=1)
+
+
+class TrialResponse(BaseModel):
+    response: str
+    messages_used: int
+    max_messages: int
+    messages_remaining: int
+
+
+class TrialStatusResponse(BaseModel):
+    has_trial: bool
+    messages_used: int
+    max_messages: int
+    exhausted: bool
+
+
+# ── Assistant ──────────────────────────────────────────────────
+
+class AssistantMessage(BaseModel):
+    role: str
+    content: str
+
+
+class AssistantChatRequest(BaseModel):
+    message: str = Field(min_length=1)
+    history: list[AssistantMessage] = Field(default_factory=list)
+
+
+class AssistantChatResponse(BaseModel):
+    response: str

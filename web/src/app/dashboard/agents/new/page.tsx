@@ -35,20 +35,9 @@ export default function CreateAgentPage() {
   const [tagline, setTagline] = useState("");
   const [category, setCategory] = useState("software-development");
   const [description, setDescription] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [priceUsd, setPriceUsd] = useState("0.10");
   const [tagsInput, setTagsInput] = useState("");
-  const [capsInput, setCapsInput] = useState("");
-  const [pricingModel, setPricingModel] = useState("");
-  const [pricingInput, setPricingInput] = useState("");
-  const [demoUrl, setDemoUrl] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [apiEndpoint, setApiEndpoint] = useState("");
-
-  // OpenClaw
   const [listingType, setListingType] = useState<"chat" | "openclaw">("chat");
-  const [openclawRepoUrl, setOpenclawRepoUrl] = useState("");
-  const [openclawInstructions, setOpenclawInstructions] = useState("");
-  const [openclawVersion, setOpenclawVersion] = useState("");
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -58,37 +47,18 @@ export default function CreateAgentPage() {
     if (!token) return;
 
     const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
-    const capabilities = capsInput.split(",").map((t) => t.trim()).filter(Boolean);
-
-    let pricing_details: Record<string, number> = {};
-    if (pricingInput.trim()) {
-      try {
-        pricing_details = JSON.parse(pricingInput);
-      } catch {
-        pricing_details = {};
-      }
-    }
 
     try {
-      await createAgentProfile(token, {
+      const agent = await createAgentProfile(token, {
         name,
-        tagline,
+        tagline: tagline || undefined,
         category,
-        description,
-        avatar_url: avatarUrl || undefined,
+        description: description || undefined,
         tags,
-        capabilities,
-        pricing_model: pricingModel || undefined,
-        pricing_details,
-        demo_url: demoUrl || undefined,
-        source_url: sourceUrl || undefined,
-        api_endpoint: apiEndpoint || undefined,
         listing_type: listingType,
-        openclaw_repo_url: openclawRepoUrl || undefined,
-        openclaw_install_instructions: openclawInstructions || undefined,
-        openclaw_version: openclawVersion || undefined,
+        price_usd: parseFloat(priceUsd) || 0,
       });
-      router.push("/dashboard/agents");
+      router.push(`/dashboard/agents/${agent.id}/config`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create agent");
     } finally {
@@ -109,6 +79,7 @@ export default function CreateAgentPage() {
           </div>
         )}
 
+        {/* Listing Type */}
         <Card className="p-6 space-y-4">
           <h2 className="font-heading font-bold text-foreground">Agent Type</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -122,7 +93,7 @@ export default function CreateAgentPage() {
               }`}
             >
               <p className="font-heading font-bold text-foreground text-sm">Chat Agent</p>
-              <p className="text-xs text-muted mt-1">Users chat with your agent via the Swarm web UI</p>
+              <p className="text-xs text-muted mt-1">Users chat via Swarm web UI</p>
             </button>
             <button
               type="button"
@@ -134,33 +105,27 @@ export default function CreateAgentPage() {
               }`}
             >
               <p className="font-heading font-bold text-foreground text-sm">OpenClaw Agent</p>
-              <p className="text-xs text-muted mt-1">Users run your agent locally, LLM calls route through Swarm</p>
+              <p className="text-xs text-muted mt-1">Users run your agent locally</p>
             </button>
           </div>
         </Card>
 
-        {listingType === "openclaw" && (
-          <Card className="p-6 space-y-4">
-            <h2 className="font-heading font-bold text-foreground">OpenClaw Configuration</h2>
-            <Input label="Repository URL" value={openclawRepoUrl} onChange={(e) => setOpenclawRepoUrl(e.target.value)} placeholder="https://github.com/you/your-agent" />
-            <Input label="Version" value={openclawVersion} onChange={(e) => setOpenclawVersion(e.target.value)} placeholder="1.0.0" />
-            <div>
-              <label className="block text-sm font-medium text-muted mb-2">Install Instructions</label>
-              <textarea
-                value={openclawInstructions}
-                onChange={(e) => setOpenclawInstructions(e.target.value)}
-                rows={4}
-                placeholder={"pip install your-agent\nyour-agent init"}
-                className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y font-mono text-sm"
-              />
-            </div>
-          </Card>
-        )}
-
+        {/* Identity */}
         <Card className="p-6 space-y-4">
           <h2 className="font-heading font-bold text-foreground">Identity</h2>
-          <Input label="Name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. My Agent" required />
-          <Input label="Tagline" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="A short description of what your agent does" />
+          <Input
+            label="Agent Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. My Research Agent"
+            required
+          />
+          <Input
+            label="Tagline — one line description"
+            value={tagline}
+            onChange={(e) => setTagline(e.target.value)}
+            placeholder="What your agent does in one sentence"
+          />
           <div>
             <label className="block text-sm font-medium text-muted mb-2">Category</label>
             <select
@@ -173,54 +138,56 @@ export default function CreateAgentPage() {
               ))}
             </select>
           </div>
-          <Input label="Avatar URL" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
-        </Card>
-
-        <Card className="p-6 space-y-4">
-          <h2 className="font-heading font-bold text-foreground">Description</h2>
           <div>
-            <label className="block text-sm font-medium text-muted mb-2">Full Description</label>
+            <label className="block text-sm font-medium text-muted mb-2">
+              Description <span className="text-muted-2 font-normal">(optional)</span>
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={6}
-              placeholder="Describe your agent's capabilities, features, and use cases..."
+              rows={4}
+              placeholder="Tell users what your agent does..."
               className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
             />
           </div>
         </Card>
 
-        <Card className="p-6 space-y-4">
-          <h2 className="font-heading font-bold text-foreground">Tags & Capabilities</h2>
-          <Input label="Tags (comma-separated)" value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} placeholder="e.g. tax-prep, filing, compliance" />
-          <Input label="Capabilities (comma-separated)" value={capsInput} onChange={(e) => setCapsInput(e.target.value)} placeholder="e.g. Document Parsing, Tax Calculation" />
-        </Card>
-
+        {/* Pricing */}
         <Card className="p-6 space-y-4">
           <h2 className="font-heading font-bold text-foreground">Pricing</h2>
-          <Input label="Pricing Model" value={pricingModel} onChange={(e) => setPricingModel(e.target.value)} placeholder="e.g. per-task, monthly, hourly" />
           <div>
-            <label className="block text-sm font-medium text-muted mb-2">Pricing Details (JSON)</label>
-            <textarea
-              value={pricingInput}
-              onChange={(e) => setPricingInput(e.target.value)}
-              rows={3}
-              placeholder='e.g. {"basic": 49, "pro": 149}'
-              className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground font-mono text-sm placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 resize-y"
-            />
+            <label className="block text-sm font-medium text-muted mb-2">Price per message</label>
+            <div className="flex items-center gap-2">
+              <span className="text-muted font-medium">$</span>
+              <input
+                type="number"
+                value={priceUsd}
+                onChange={(e) => setPriceUsd(e.target.value)}
+                min="0"
+                step="0.01"
+                placeholder="0.10"
+                className="flex-1 bg-surface-2 rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+              />
+              <span className="text-muted text-sm">USD per message</span>
+            </div>
+            <p className="text-xs text-muted mt-1.5">Default: $0.10 = 10 credits. Set to 0 for free.</p>
           </div>
         </Card>
 
+        {/* Tags */}
         <Card className="p-6 space-y-4">
-          <h2 className="font-heading font-bold text-foreground">Links</h2>
-          <Input label="Demo URL" value={demoUrl} onChange={(e) => setDemoUrl(e.target.value)} placeholder="https://..." />
-          <Input label="Source Code URL" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://github.com/..." />
-          <Input label="API Endpoint" value={apiEndpoint} onChange={(e) => setApiEndpoint(e.target.value)} placeholder="https://api...." />
+          <h2 className="font-heading font-bold text-foreground">Tags</h2>
+          <Input
+            label="Tags (comma-separated)"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="e.g. research, analysis, reports"
+          />
         </Card>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={loading} className="flex-1">
-            {loading ? "Publishing..." : "Publish Agent"}
+            {loading ? "Creating..." : "Create Agent"}
           </Button>
           <Button type="button" variant="secondary" onClick={() => router.back()}>
             Cancel

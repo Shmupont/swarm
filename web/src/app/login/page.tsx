@@ -3,11 +3,18 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { login } from "@/lib/api";
-import { setToken } from "@/lib/auth";
+import { login, getMe } from "@/lib/api";
+import { setToken, getToken } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import NeuralNetwork from "@/components/neural-network";
+
+function getRedirectPath(user: { onboarding_completed: boolean; user_type: string | null }) {
+  if (!user.onboarding_completed) return "/onboarding";
+  if (user.user_type === "creator") return "/dashboard/mission-control";
+  if (user.user_type === "user") return "/portal";
+  return "/dashboard";
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,7 +30,8 @@ export default function LoginPage() {
     try {
       const data = await login(email, password);
       setToken(data.access_token);
-      router.push("/dashboard");
+      const me = await getMe(data.access_token);
+      router.push(getRedirectPath(me));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

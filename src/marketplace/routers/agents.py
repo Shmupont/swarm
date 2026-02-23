@@ -16,6 +16,7 @@ from ..models import (
     Message,
     ProxyUsageLog,
     Task,
+    TrialSession,
     User,
 )
 from ..schemas import (
@@ -35,6 +36,9 @@ from ..schemas import (
     PricingPlanResponse,
     PurchaseRequest,
     PurchaseResponse,
+    TrialSendRequest,
+    TrialResponse,
+    TrialStatusResponse,
     UsageLogResponse,
     UsageStatsResponse,
     WebhookConfigRequest,
@@ -93,6 +97,10 @@ def create_agent_profile(
     if data.listing_type not in ("chat", "openclaw"):
         raise HTTPException(400, "listing_type must be 'chat' or 'openclaw'")
 
+    price_credits = 0
+    if data.price_usd is not None:
+        price_credits = round(data.price_usd * 100)
+
     profile = AgentProfile(
         owner_id=user.id,
         name=data.name,
@@ -116,6 +124,7 @@ def create_agent_profile(
         openclaw_repo_url=data.openclaw_repo_url,
         openclaw_install_instructions=data.openclaw_install_instructions,
         openclaw_version=data.openclaw_version,
+        price_per_message_credits=price_credits,
     )
     session.add(profile)
     session.commit()
@@ -561,6 +570,98 @@ def get_license_status(
         )
     ).first()
     return {"has_license": license is not None, "license_id": str(license.id) if license else None}
+
+
+# ── Trial Endpoints ──────────────────────────────────────────────────
+
+
+@router.get("/agents/{agent_id}/trial-status", response_model=TrialStatusResponse)
+def get_trial_status(
+    agent_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+
+    trial = session.exec(
+        select(TrialSession).where(
+            TrialSession.user_id == user.id,
+            TrialSession.agent_id == agent_id,
+        )
+    ).first()
+
+    if not trial:
+        return TrialStatusResponse(has_trial=False, messages_used=0, max_messages=3, exhausted=False)
+
+    return TrialStatusResponse(
+        has_trial=True,
+        messages_used=trial.messages_used,
+        max_messages=trial.max_messages,
+        exhausted=trial.messages_used >= trial.max_messages,
+    )
+
+
+@router.post("/agents/{agent_id}/trial", response_model=TrialResponse)
+def send_trial_message(
+    agent_id: uuid.UUID,
+    data: TrialSendRequest,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    agent = session.get(AgentProfile, agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+
+    trial = session.exec(
+        select(TrialSession).where(
+            TrialSession.user_id == user.id,
+            TrialSession.agent_id == agent_id,
+        )
+    ).first()
+
+    if trial and trial.messages_used >= trial.max_messages:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "trial_exhausted", "message": "Your 3 free messages have been used."},
+        )
+
+    if not trial:
+        trial = TrialSession(user_id=user.id, agent_id=agent_id, messages_used=0, max_messages=3)
+        session.add(trial)
+        session.flush()
+
+    # Call agent LLM if configured, otherwise use generic response
+    response_text = ""
+    if agent.system_prompt and agent.has_api_key and agent.encrypted_api_key:
+        try:
+            from ..llm import call_agent
+            result = call_agent(
+                encrypted_api_key=agent.encrypted_api_key,
+                system_prompt=agent.system_prompt,
+                messages=[{"role": "user", "content": data.message}],
+                model=agent.llm_model,
+                temperature=agent.temperature,
+                max_tokens=agent.max_tokens,
+            )
+            response_text = result["content"]
+        except Exception:
+            response_text = f"Hi! I'm {agent.name}. This is a trial — hire me to unlock the full experience."
+    else:
+        response_text = f"Hi! I'm {agent.name}. This is a trial — hire me to unlock the full experience."
+
+    trial.messages_used += 1
+    session.add(trial)
+    session.commit()
+
+    remaining = trial.max_messages - trial.messages_used
+    return TrialResponse(
+        response=response_text,
+        messages_used=trial.messages_used,
+        max_messages=trial.max_messages,
+        messages_remaining=remaining,
+    )
 
 
 # ── Webhook Config (JWT, owner) ────────────────────────────────────

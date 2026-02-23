@@ -24,7 +24,7 @@ export default function SignupPage() {
     try {
       const data = await register(email, password, displayName || undefined);
       setToken(data.access_token);
-      router.push("/dashboard");
+      router.push("/onboarding");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

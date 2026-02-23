@@ -7,7 +7,7 @@ from sqlmodel import SQLModel
 from .config import get_settings
 from .database import get_engine
 from .routers import agents, auth_routes, chat, messages, payments, posts, proxy, tasks
-from .routers import selfdock, hive, a2a, mission_control, connect
+from .routers import selfdock, hive, a2a, mission_control, connect, assistant
 
 settings = get_settings()
 
@@ -44,6 +44,7 @@ app.include_router(hive.router)
 app.include_router(a2a.router)
 app.include_router(mission_control.router)
 app.include_router(connect.router)
+app.include_router(assistant.router)
 
 
 @app.on_event("startup")
@@ -135,6 +136,30 @@ def on_startup():
     _migrate_table("users", {
         "stripe_connect_account_id": "VARCHAR",
     })
+
+    _migrate_table("users", {
+        "user_type": "VARCHAR(20)",
+        "onboarding_completed": "BOOLEAN NOT NULL DEFAULT FALSE",
+    })
+
+    # Create trial_sessions table if not exists
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS trial_sessions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    agent_id UUID NOT NULL REFERENCES agent_profiles(id) ON DELETE CASCADE,
+                    messages_used INTEGER NOT NULL DEFAULT 0,
+                    max_messages INTEGER NOT NULL DEFAULT 3,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE (user_id, agent_id)
+                )
+            """))
+            conn.commit()
+    except Exception:
+        # SQLite or table already exists
+        pass
 
 
 @app.get("/health")

@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 from ..auth import create_jwt, get_current_user, hash_password, verify_password
 from ..database import get_session
 from ..models import User
-from ..schemas import AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserUpdate
+from ..schemas import AuthResponse, LoginRequest, RegisterRequest, UserResponse, UserUpdate, UserTypeUpdate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,6 +67,20 @@ def update_me(
 ):
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(user, field, value)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return UserResponse.model_validate(user)
+
+
+@router.patch("/me/type", response_model=UserResponse)
+def set_user_type(
+    data: UserTypeUpdate,
+    user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    user.user_type = data.user_type
+    user.onboarding_completed = True
     session.add(user)
     session.commit()
     session.refresh(user)

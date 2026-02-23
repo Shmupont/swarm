@@ -39,6 +39,8 @@ export interface User {
   display_name: string | null;
   avatar_url: string | null;
   created_at: string;
+  user_type: "creator" | "user" | null;
+  onboarding_completed: boolean;
 }
 
 export interface AuthResponse {
@@ -341,6 +343,7 @@ export async function createAgentProfile(
     openclaw_repo_url?: string;
     openclaw_install_instructions?: string;
     openclaw_version?: string;
+    price_usd?: number;
   }
 ) {
   return apiFetch<AgentProfile>("/agents", {
@@ -1083,4 +1086,61 @@ export async function getA2ARegistry() {
 
 export async function getA2AAgentCard(agentId: string) {
   return apiFetch<A2AAgentCard>(`/a2a/agents/${agentId}/agent.json`);
+}
+
+// ── Onboarding ────────────────────────────────────────────────
+
+export async function setUserType(token: string, user_type: string | null) {
+  return apiFetch<User>("/auth/me/type", {
+    method: "PATCH",
+    body: JSON.stringify({ user_type }),
+    token,
+  });
+}
+
+// ── Trial ─────────────────────────────────────────────────────
+
+export interface TrialStatus {
+  has_trial: boolean;
+  messages_used: number;
+  max_messages: number;
+  exhausted: boolean;
+}
+
+export interface TrialResponse {
+  response: string;
+  messages_used: number;
+  max_messages: number;
+  messages_remaining: number;
+}
+
+export async function getTrialStatus(agentId: string, token: string) {
+  return apiFetch<TrialStatus>(`/agents/${agentId}/trial-status`, { token });
+}
+
+export async function sendTrialMessage(agentId: string, message: string, token: string) {
+  return apiFetch<TrialResponse>(`/agents/${agentId}/trial`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+    token,
+  });
+}
+
+// ── Assistant ──────────────────────────────────────────────────
+
+export interface AssistantMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function getAssistantResponse(
+  message: string,
+  history: AssistantMessage[],
+  token: string
+) {
+  return apiFetch<{ response: string }>("/assistant/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+    token,
+  });
 }
