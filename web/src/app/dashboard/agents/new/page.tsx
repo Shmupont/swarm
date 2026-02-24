@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X, Plus } from "lucide-react";
 import { getToken } from "@/lib/auth";
 import { createAgentProfile } from "@/lib/api";
 import { Input } from "@/components/ui/input";
@@ -26,6 +27,13 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+interface RequiredInput {
+  id: string;
+  fieldName: string;
+  fieldType: "text" | "number" | "dropdown" | "date";
+  required: boolean;
+}
+
 export default function CreateAgentPage() {
   const router = useRouter();
   const [error, setError] = useState("");
@@ -37,7 +45,35 @@ export default function CreateAgentPage() {
   const [description, setDescription] = useState("");
   const [priceUsd, setPriceUsd] = useState("0.10");
   const [tagsInput, setTagsInput] = useState("");
-  const [listingType, setListingType] = useState<"chat" | "openclaw">("chat");
+  const [listingType, setListingType] = useState<"chat" | "openclaw" | "automation">("chat");
+
+  // Automation-specific state
+  const [billingModel, setBillingModel] = useState<"per_run" | "weekly">("per_run");
+  const [requiredInputs, setRequiredInputs] = useState<RequiredInput[]>([]);
+  const [outputMethods, setOutputMethods] = useState<string[]>(["in_app"]);
+
+  function addRequiredInput() {
+    setRequiredInputs((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), fieldName: "", fieldType: "text", required: true },
+    ]);
+  }
+
+  function removeRequiredInput(id: string) {
+    setRequiredInputs((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  function updateRequiredInput(id: string, patch: Partial<RequiredInput>) {
+    setRequiredInputs((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...patch } : i))
+    );
+  }
+
+  function toggleOutputMethod(method: string) {
+    setOutputMethods((prev) =>
+      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
+    );
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -48,16 +84,30 @@ export default function CreateAgentPage() {
 
     const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
 
+    const payload: Record<string, unknown> = {
+      name,
+      tagline: tagline || undefined,
+      category,
+      description: description || undefined,
+      tags,
+      listing_type: listingType,
+      price_usd: parseFloat(priceUsd) || 0,
+    };
+
+    if (listingType === "automation") {
+      payload.required_inputs_json = JSON.stringify(
+        requiredInputs.map(({ fieldName, fieldType, required }) => ({
+          field_name: fieldName,
+          field_type: fieldType,
+          required,
+        }))
+      );
+      payload.output_methods = outputMethods.join(",");
+      payload.billing_model = billingModel;
+    }
+
     try {
-      const agent = await createAgentProfile(token, {
-        name,
-        tagline: tagline || undefined,
-        category,
-        description: description || undefined,
-        tags,
-        listing_type: listingType,
-        price_usd: parseFloat(priceUsd) || 0,
-      });
+      const agent = await createAgentProfile(token, payload as Parameters<typeof createAgentProfile>[1]);
       router.push(`/dashboard/agents/${agent.id}/config`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create agent");
@@ -65,6 +115,20 @@ export default function CreateAgentPage() {
       setLoading(false);
     }
   }
+
+  const pricingLabel =
+    listingType === "automation"
+      ? billingModel === "per_run"
+        ? "Price per run"
+        : "Weekly price"
+      : "Price per answer";
+
+  const pricingUnit =
+    listingType === "automation"
+      ? billingModel === "per_run"
+        ? "per run"
+        : "per week"
+      : "per answer";
 
   return (
     <div className="max-w-2xl">
@@ -82,7 +146,7 @@ export default function CreateAgentPage() {
         {/* Listing Type */}
         <Card className="p-6 space-y-4">
           <h2 className="font-heading font-bold text-foreground">Agent Type</h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => setListingType("chat")}
@@ -107,8 +171,144 @@ export default function CreateAgentPage() {
               <p className="font-heading font-bold text-foreground text-sm">OpenClaw Agent</p>
               <p className="text-xs text-muted mt-1">Users run your agent locally</p>
             </button>
+            <button
+              type="button"
+              onClick={() => setListingType("automation")}
+              className={`p-4 rounded-xl border-2 text-left transition-all ${
+                listingType === "automation"
+                  ? "border-accent bg-accent-muted"
+                  : "border-surface-2 bg-surface-2 hover:border-muted-2"
+              }`}
+            >
+              <p className="font-heading font-bold text-foreground text-sm">Automation Agent</p>
+              <p className="text-xs text-muted mt-1">Runs tasks in the background, no tab required</p>
+            </button>
           </div>
         </Card>
+
+        {/* Automation-specific fields */}
+        {listingType === "automation" && (
+          <>
+            {/* Billing Model */}
+            <Card className="p-6 space-y-4">
+              <h2 className="font-heading font-bold text-foreground">Billing Model</h2>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBillingModel("per_run")}
+                  className={`flex-1 py-2.5 px-4 rounded-xl border-2 text-sm font-medium transition-all ${
+                    billingModel === "per_run"
+                      ? "border-accent bg-accent-muted text-accent"
+                      : "border-surface-2 bg-surface-2 text-muted hover:border-muted-2"
+                  }`}
+                >
+                  Per Run
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingModel("weekly")}
+                  className={`flex-1 py-2.5 px-4 rounded-xl border-2 text-sm font-medium transition-all ${
+                    billingModel === "weekly"
+                      ? "border-accent bg-accent-muted text-accent"
+                      : "border-surface-2 bg-surface-2 text-muted hover:border-muted-2"
+                  }`}
+                >
+                  Weekly
+                </button>
+              </div>
+              <p className="text-xs text-muted">
+                {billingModel === "per_run"
+                  ? "User is charged once per task execution. Good for one-time searches."
+                  : "User is charged weekly. Good for continuous monitoring agents."}
+              </p>
+            </Card>
+
+            {/* Required Inputs */}
+            <Card className="p-6 space-y-4">
+              <div>
+                <h2 className="font-heading font-bold text-foreground">Required Inputs</h2>
+                <p className="text-xs text-muted mt-1">Define what information users must provide when hiring this agent.</p>
+              </div>
+
+              {requiredInputs.length > 0 && (
+                <div className="space-y-3">
+                  {requiredInputs.map((inp) => (
+                    <div key={inp.id} className="flex items-center gap-2 bg-surface-2 rounded-xl p-3">
+                      <input
+                        type="text"
+                        value={inp.fieldName}
+                        onChange={(e) => updateRequiredInput(inp.id, { fieldName: e.target.value })}
+                        placeholder="e.g. Location, Brand, Budget"
+                        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-2 focus:outline-none"
+                      />
+                      <select
+                        value={inp.fieldType}
+                        onChange={(e) =>
+                          updateRequiredInput(inp.id, {
+                            fieldType: e.target.value as RequiredInput["fieldType"],
+                          })
+                        }
+                        className="bg-surface rounded-lg px-2 py-1 text-xs text-foreground focus:outline-none"
+                      >
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="dropdown">Dropdown</option>
+                        <option value="date">Date</option>
+                      </select>
+                      <label className="flex items-center gap-1 text-xs text-muted cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={inp.required}
+                          onChange={(e) => updateRequiredInput(inp.id, { required: e.target.checked })}
+                          className="accent-accent"
+                        />
+                        Req
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeRequiredInput(inp.id)}
+                        className="text-muted hover:text-error transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={addRequiredInput}
+                className="flex items-center gap-1.5 text-sm text-accent hover:text-accent-hover transition-colors"
+              >
+                <Plus className="w-4 h-4" /> Add Input
+              </button>
+            </Card>
+
+            {/* Output Method */}
+            <Card className="p-6 space-y-4">
+              <div>
+                <h2 className="font-heading font-bold text-foreground">How should results be delivered?</h2>
+              </div>
+              <div className="space-y-2">
+                {[
+                  { value: "in_app", label: "In-app notification" },
+                  { value: "email", label: "Email to user" },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={outputMethods.includes(opt.value)}
+                      onChange={() => toggleOutputMethod(opt.value)}
+                      className="accent-accent w-4 h-4"
+                    />
+                    <span className="text-sm text-foreground">{opt.label}</span>
+                  </label>
+                ))}
+              </div>
+            </Card>
+          </>
+        )}
 
         {/* Identity */}
         <Card className="p-6 space-y-4">
@@ -156,7 +356,7 @@ export default function CreateAgentPage() {
         <Card className="p-6 space-y-4">
           <h2 className="font-heading font-bold text-foreground">Pricing</h2>
           <div>
-            <label className="block text-sm font-medium text-muted mb-2">Price per message</label>
+            <label className="block text-sm font-medium text-muted mb-2">{pricingLabel}</label>
             <div className="flex items-center gap-2">
               <span className="text-muted font-medium">$</span>
               <input
@@ -168,9 +368,9 @@ export default function CreateAgentPage() {
                 placeholder="0.10"
                 className="flex-1 bg-surface-2 rounded-xl px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
               />
-              <span className="text-muted text-sm">USD per message</span>
+              <span className="text-muted text-sm">{pricingUnit}</span>
             </div>
-            <p className="text-xs text-muted mt-1.5">Default: $0.10 = 10 credits. Set to 0 for free.</p>
+            <p className="text-xs text-muted mt-1.5">Default: $0.10 per answer. Set to 0 for free.</p>
           </div>
         </Card>
 

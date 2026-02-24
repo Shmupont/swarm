@@ -86,7 +86,7 @@ export interface AgentProfile {
   welcome_message: string | null;
   llm_provider: string;
   // OpenClaw
-  listing_type: "chat" | "openclaw";
+  listing_type: "chat" | "openclaw" | "automation";
   openclaw_repo_url: string | null;
   openclaw_install_instructions: string | null;
   openclaw_version: string | null;

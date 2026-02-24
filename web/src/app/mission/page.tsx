@@ -3,7 +3,7 @@
 import Link from "next/link";
 import NeuralNetwork from "@/components/neural-network";
 import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
+import { Footer } from "@/components/footer";
 
 const Section = ({
   label,

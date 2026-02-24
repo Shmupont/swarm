@@ -63,7 +63,7 @@ export default function EditAgentPage() {
   const [isDocked, setIsDocked] = useState(true);
 
   // OpenClaw fields
-  const [listingType, setListingType] = useState<"chat" | "openclaw">("chat");
+  const [listingType, setListingType] = useState<"chat" | "openclaw" | "automation">("chat");
   const [openclawRepoUrl, setOpenclawRepoUrl] = useState("");
   const [openclawInstructions, setOpenclawInstructions] = useState("");
   const [openclawVersion, setOpenclawVersion] = useState("");

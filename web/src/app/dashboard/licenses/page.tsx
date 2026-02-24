@@ -66,7 +66,7 @@ export default function LicensesPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <h1 className="font-heading text-2xl font-bold text-foreground">My Licenses</h1>
+        <h1 className="font-heading text-2xl font-bold text-foreground">My Hired Agents</h1>
         {[...Array(3)].map((_, i) => (
           <Skeleton key={i} className="h-32" />
         ))}
@@ -76,18 +76,21 @@ export default function LicensesPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground mb-6">
-        My Licenses
-      </h1>
+      <div className="mb-6">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          My Hired Agents
+        </h1>
+        <p className="text-sm text-muted mt-1">Agents you&apos;ve hired and have access to run</p>
+      </div>
 
       {licenses.length === 0 ? (
         <Card className="p-12 text-center">
           <Key className="w-12 h-12 text-muted-2 mx-auto mb-4" />
           <h2 className="font-heading text-lg font-bold text-foreground mb-2">
-            No licenses yet
+            No agents hired yet
           </h2>
           <p className="text-sm text-muted mb-4">
-            Purchase access to an OpenClaw agent to get started.
+            Browse the marketplace and hire an agent to get started.
           </p>
           <Link href="/browse">
             <Button>Browse Agents</Button>
@@ -106,7 +109,7 @@ export default function LicensesPage() {
                       <StatusDot status={lic.status} />
                       <Link
                         href={`/agents/${lic.agent_slug}`}
-                        className="font-heading font-bold text-foreground hover:text-accent transition-colors"
+                        className="font-heading font-bold text-foreground hover:text-accent transition-colors text-lg"
                       >
                         {lic.agent_name || "Unknown Agent"}
                       </Link>
@@ -159,13 +162,20 @@ export default function LicensesPage() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleExpand(lic.id)}
-                  >
-                    {expanded ? "Hide" : "Usage"}
-                  </Button>
+                  <div className="flex flex-col gap-2 items-end shrink-0">
+                    <Link href={`/agents/${lic.agent_slug}/chat`}>
+                      <Button size="sm" className="whitespace-nowrap">
+                        {lic.plan_type === "automation" ? "Run Now →" : "Chat Now →"}
+                      </Button>
+                    </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleExpand(lic.id)}
+                    >
+                      {expanded ? "Hide" : "Usage"}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Expanded usage log */}

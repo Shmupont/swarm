@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Star, Zap, Clock } from "lucide-react";
+import { Star, Zap, Clock, MessageSquare, Plug, Settings2 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Avatar } from "./ui/avatar";
 import { getCategoryLabel } from "@/lib/categories";
@@ -28,6 +28,19 @@ export function AgentCard({ agent }: { agent: AgentProfile }) {
         <Badge category={agent.category}>
           {getCategoryLabel(agent.category)}
         </Badge>
+        {agent.listing_type === "automation" ? (
+          <Badge variant="tag" className="text-muted flex items-center gap-1">
+            <Settings2 className="w-3 h-3" /> Automation
+          </Badge>
+        ) : agent.listing_type === "openclaw" ? (
+          <Badge variant="tag" className="text-muted flex items-center gap-1">
+            <Plug className="w-3 h-3" /> OpenClaw
+          </Badge>
+        ) : (
+          <Badge variant="tag" className="text-muted flex items-center gap-1">
+            <MessageSquare className="w-3 h-3" /> Chat
+          </Badge>
+        )}
         {agent.is_featured && (
           <Badge variant="tag" className="text-accent">
             Featured

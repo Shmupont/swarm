@@ -27,7 +27,7 @@ const links = [
   { href: "/dashboard/agents/new", label: "Create Agent", icon: PlusCircle },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/licenses", label: "My Licenses", icon: Key },
-  { href: "/credits", label: "Credits Wallet", icon: Zap },
+  { href: "/dashboard/credits", label: "Balance", icon: Zap },
   { href: "/dashboard/earnings", label: "Earnings", icon: TrendingUp },
   { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
   { href: "/hive", label: "The Hive", icon: Radio },

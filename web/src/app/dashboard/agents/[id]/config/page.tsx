@@ -166,11 +166,11 @@ export default function AgentConfigPage() {
         <Card className="p-6 space-y-4">
           <div>
             <h2 className="font-heading font-bold text-foreground">Pricing</h2>
-            <p className="text-sm text-muted mt-1">Set how much users pay per message</p>
+            <p className="text-sm text-muted mt-1">Set how much users pay per answer</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-muted mb-1.5">
-              Credits per message
+              Price per answer (credits)
             </label>
             <input
               type="number"
@@ -180,7 +180,7 @@ export default function AgentConfigPage() {
               className="w-full bg-surface-2 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-2 focus:outline-none focus:ring-2 focus:ring-accent/30 text-sm"
             />
             <p className="text-xs text-muted mt-1.5">
-              {priceCredits === 0 ? "Free for all users" : `Users pay ${priceCredits} credits per message`}
+              {priceCredits === 0 ? "Free for all users" : `Users pay $${(priceCredits / 100).toFixed(2)} per answer`}
             </p>
           </div>
         </Card>

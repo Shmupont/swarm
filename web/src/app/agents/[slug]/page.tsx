@@ -151,7 +151,7 @@ export default function AgentProfilePage() {
       router.push(`/agents/${slug}/chat`);
     } catch (err) {
       if (err instanceof Error && err.message.includes("402")) {
-        setHireError(`Insufficient credits. Top up at /credits.`);
+        setHireError(`Insufficient balance. Add funds to continue.`);
       } else {
         setHireError(err instanceof Error ? err.message : "Failed to hire agent");
       }
@@ -280,8 +280,8 @@ export default function AgentProfilePage() {
                         <div className="flex flex-col items-end gap-1">
                           {agent.price_per_message_credits > 0 && (
                             <p className="text-sm text-muted">
-                              <span className="text-accent font-bold">⚡ {agent.price_per_message_credits}</span>
-                              <span className="text-xs ml-1">credits/msg</span>
+                              <span className="text-accent font-bold">${(agent.price_per_message_credits / 100).toFixed(2)}</span>
+                              <span className="text-xs ml-1">/answer</span>
                             </p>
                           )}
                           {hasLicense ? (
@@ -303,16 +303,16 @@ export default function AgentProfilePage() {
                                 <div className="h-px bg-border flex-1" />
                               </div>
                               {trialExhausted ? (
-                                <p className="text-xs text-muted">You&apos;ve used your 3 free messages</p>
+                                <p className="text-xs text-muted">You&apos;ve used your 3 free answers</p>
                               ) : (
                                 <button
                                   onClick={handleTryFree}
                                   className="text-sm text-accent hover:text-accent-hover transition-colors font-medium"
                                 >
-                                  Try 3 Free Messages
+                                  Try 3 Free Answers
                                 </button>
                               )}
-                              <p className="text-xs text-muted mt-0.5">No credits needed</p>
+                              <p className="text-xs text-muted mt-0.5">No payment needed</p>
                             </div>
                           )}
                         </div>
@@ -336,16 +336,30 @@ export default function AgentProfilePage() {
 
                   <div className="flex flex-wrap items-center gap-3 mt-3">
                     <Badge category={agent.category}>{getCategoryLabel(agent.category)}</Badge>
+                    {agent.listing_type === "automation" ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-surface-2 text-muted px-2.5 py-1 rounded-full">⚙ Automation</span>
+                    ) : agent.listing_type === "openclaw" ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-surface-2 text-muted px-2.5 py-1 rounded-full">🔌 OpenClaw</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium bg-surface-2 text-muted px-2.5 py-1 rounded-full">💬 Chat</span>
+                    )}
                     {agent.owner_display_name && (
                       <span className="text-sm text-muted">by {agent.owner_display_name}</span>
                     )}
                   </div>
+                  {agent.listing_type !== "openclaw" && agent.price_per_message_credits > 0 && (
+                    <p className="text-xs text-muted mt-2">
+                      {agent.listing_type === "automation"
+                        ? `Billed per run — $${(agent.price_per_message_credits / 100).toFixed(2)} each`
+                        : `Billed per answer — $${(agent.price_per_message_credits / 100).toFixed(2)} each`}
+                    </p>
+                  )}
 
                   {hireError && (
                     <div className="mt-3 text-sm text-error bg-error/10 px-3 py-2 rounded-xl">
                       {hireError}{" "}
-                      {hireError.includes("credits") && (
-                        <a href="/credits" className="underline hover:text-accent">Top up →</a>
+                      {hireError.includes("balance") && (
+                        <a href="/dashboard/credits" className="underline hover:text-accent">Add funds →</a>
                       )}
                     </div>
                   )}
@@ -389,9 +403,9 @@ export default function AgentProfilePage() {
                 <div className="mt-6 border border-accent/20 rounded-2xl overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 bg-accent/5 border-b border-accent/20">
                     <div>
-                      <span className="font-medium text-foreground text-sm">Trial Chat (3 free messages)</span>
+                      <span className="font-medium text-foreground text-sm">Try Free (3 answers)</span>
                       <span className="ml-3 text-xs text-muted">
-                        Messages remaining: {trialMaxMessages - trialMessagesUsed}
+                        Answers remaining: {trialMaxMessages - trialMessagesUsed}
                       </span>
                     </div>
                     <button onClick={() => setTrialOpen(false)} className="text-muted hover:text-foreground">
@@ -680,8 +694,8 @@ export default function AgentProfilePage() {
                       <div className="space-y-2">
                         {agent.price_per_message_credits > 0 && (
                           <p className="text-center">
-                            <span className="text-accent font-bold text-lg">⚡ {agent.price_per_message_credits}</span>
-                            <span className="text-muted text-sm ml-1">credits / message</span>
+                            <span className="text-accent font-bold text-lg">${(agent.price_per_message_credits / 100).toFixed(2)}</span>
+                            <span className="text-muted text-sm ml-1">per answer</span>
                           </p>
                         )}
                         {hasLicense ? (
@@ -700,13 +714,13 @@ export default function AgentProfilePage() {
                               <div className="h-px bg-border flex-1" />
                             </div>
                             {trialExhausted ? (
-                              <p className="text-xs text-muted text-center">You&apos;ve used your 3 free messages</p>
+                              <p className="text-xs text-muted text-center">You&apos;ve used your 3 free answers</p>
                             ) : (
                               <Button variant="ghost" onClick={handleTryFree} className="w-full">
-                                Try 3 Free Messages
+                                Try 3 Free Answers
                               </Button>
                             )}
-                            <p className="text-xs text-muted text-center">No credits needed</p>
+                            <p className="text-xs text-muted text-center">No payment needed</p>
                           </>
                         )}
                       </div>
