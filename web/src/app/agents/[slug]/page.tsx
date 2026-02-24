@@ -41,6 +41,7 @@ import {
   getAgentLicenseStatus,
   getTrialStatus,
   sendTrialMessage,
+  startBackgroundJob,
 } from "@/lib/api";
 import { isLoggedIn, getToken } from "@/lib/auth";
 import { getCategoryLabel } from "@/lib/categories";
@@ -51,6 +52,192 @@ type Tab = "posts" | "about";
 interface TrialMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+// ── Automation Hire Modal ─────────────────────────────────────────────
+
+interface AutomationModalProps {
+  agent: AgentProfile;
+  onClose: () => void;
+  onStarted: () => void;
+}
+
+function AutomationModal({ agent, onClose, onStarted }: AutomationModalProps) {
+  const router = useRouter();
+  const scheduleOptions: string[] = (agent as unknown as Record<string, unknown>).schedule_options as string[] || ["daily"];
+  const requiredInputs: { name: string; type: string; required: boolean }[] =
+    (agent as unknown as Record<string, unknown>).required_inputs_schema as { name: string; type: string; required: boolean }[] || [];
+  const pricePerRun: number = ((agent as unknown as Record<string, unknown>).price_per_run_credits as number) || agent.price_per_message_credits || 50;
+  const priceWeekly: number = ((agent as unknown as Record<string, unknown>).price_weekly_credits as number) || 500;
+
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [schedule, setSchedule] = useState(scheduleOptions[0] || "daily");
+  const [outputMethods, setOutputMethods] = useState<string[]>(["in_app"]);
+  const [notifEmail, setNotifEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const scheduleLabels: Record<string, string> = {
+    once: "One-time",
+    hourly: "Hourly",
+    daily: "Daily",
+    weekly: "Weekly",
+  };
+
+  const estimatedCost = schedule === "weekly"
+    ? `${(priceWeekly / 100).toFixed(2)}/week`
+    : schedule === "daily"
+    ? `${(pricePerRun / 100).toFixed(2)}/day`
+    : schedule === "hourly"
+    ? `${(pricePerRun / 100).toFixed(2)}/hour`
+    : `${(pricePerRun / 100).toFixed(2)} one-time`;
+
+  const toggleOutputMethod = (method: string) => {
+    setOutputMethods((prev) =>
+      prev.includes(method) ? prev.filter((m) => m !== method) : [...prev, method]
+    );
+  };
+
+  const handleStart = async () => {
+    const token = getToken();
+    if (!token) { router.push("/login"); return; }
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await startBackgroundJob(token, {
+        agent_id: agent.id,
+        config,
+        schedule,
+        output_methods: outputMethods,
+        notification_email: outputMethods.includes("email") && notifEmail ? notifEmail : undefined,
+      });
+      onStarted();
+      router.push("/dashboard/active-jobs");
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to start agent");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70" />
+      <div
+        className="relative bg-surface rounded-2xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-5 border-b border-border">
+          <div>
+            <h2 className="font-heading font-bold text-foreground">Configure {agent.name}</h2>
+            <p className="text-xs text-muted mt-0.5">Set up your automation agent</p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-foreground">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Required inputs */}
+          {requiredInputs.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-foreground">Configuration</h3>
+              {requiredInputs.map((input) => (
+                <div key={input.name}>
+                  <label className="block text-xs text-muted mb-1.5 capitalize">
+                    {input.name.replace(/_/g, " ")}
+                    {input.required && <span className="text-red-400 ml-1">*</span>}
+                  </label>
+                  <input
+                    type={input.type === "number" ? "number" : "text"}
+                    value={config[input.name] || ""}
+                    onChange={(e) => setConfig((prev) => ({ ...prev, [input.name]: e.target.value }))}
+                    className="w-full bg-surface-2 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/30"
+                    placeholder={`Enter ${input.name.replace(/_/g, " ")}`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Schedule picker */}
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-2">Schedule</h3>
+            <div className="flex flex-wrap gap-2">
+              {scheduleOptions.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setSchedule(opt)}
+                  className={`px-4 py-2 rounded-xl text-sm transition-colors ${
+                    schedule === opt
+                      ? "bg-accent text-white font-medium"
+                      : "bg-surface-2 text-muted hover:text-foreground"
+                  }`}
+                >
+                  {scheduleLabels[opt] || opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Notification preferences */}
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-2">Notify me via</h3>
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={outputMethods.includes("in_app")}
+                  onChange={() => toggleOutputMethod("in_app")}
+                  className="rounded"
+                />
+                <span className="text-sm text-muted">In-app notifications</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={outputMethods.includes("email")}
+                  onChange={() => toggleOutputMethod("email")}
+                  className="rounded"
+                />
+                <span className="text-sm text-muted">Email</span>
+              </label>
+              {outputMethods.includes("email") && (
+                <input
+                  type="email"
+                  value={notifEmail}
+                  onChange={(e) => setNotifEmail(e.target.value)}
+                  className="w-full bg-surface-2 rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-1 focus:ring-accent/30 mt-1"
+                  placeholder="your@email.com"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Cost summary */}
+          <div className="bg-surface-2 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted">Estimated cost</span>
+              <span className="text-sm font-bold text-accent">${estimatedCost}</span>
+            </div>
+          </div>
+
+          {submitError && (
+            <p className="text-sm text-red-400 bg-red-400/10 px-3 py-2 rounded-xl">
+              {submitError}
+              {submitError.includes("balance") && (
+                <> — <a href="/dashboard/credits" className="underline hover:text-accent">Add funds →</a></>
+              )}
+            </p>
+          )}
+
+          <Button onClick={handleStart} disabled={submitting} className="w-full gap-2">
+            {submitting ? "Starting..." : "Start Agent →"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AgentProfilePage() {
@@ -75,6 +262,9 @@ export default function AgentProfilePage() {
   const [hiring, setHiring] = useState(false);
   const [hasLicense, setHasLicense] = useState(false);
   const [hireError, setHireError] = useState("");
+
+  // Automation modal state
+  const [automationModalOpen, setAutomationModalOpen] = useState(false);
 
   // Trial state
   const [trialOpen, setTrialOpen] = useState(false);
@@ -142,6 +332,14 @@ export default function AgentProfilePage() {
   const handleHire = async () => {
     if (!isLoggedIn()) { router.push(`/login?redirect=/agents/${slug}`); return; }
     if (!agent) return;
+
+    // Automation agents open the configuration modal instead
+    const agentMode = (agent as unknown as Record<string, unknown>).agent_mode as string | undefined;
+    if (agent.listing_type === "automation" || agentMode === "automation" || agentMode === "both") {
+      setAutomationModalOpen(true);
+      return;
+    }
+
     const token = getToken();
     if (!token) return;
     setHiring(true);
@@ -734,6 +932,14 @@ export default function AgentProfilePage() {
       </main>
 
       <Footer />
+
+      {automationModalOpen && agent && (
+        <AutomationModal
+          agent={agent}
+          onClose={() => setAutomationModalOpen(false)}
+          onStarted={() => setAutomationModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

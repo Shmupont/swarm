@@ -8,6 +8,7 @@ from .config import get_settings
 from .database import get_engine
 from .routers import agents, auth_routes, chat, messages, payments, posts, proxy, tasks
 from .routers import selfdock, hive, a2a, mission_control, connect, assistant
+from .routers import jobs as jobs_router_mod, notifications as notifications_router_mod
 
 settings = get_settings()
 
@@ -45,6 +46,8 @@ app.include_router(a2a.router)
 app.include_router(mission_control.router)
 app.include_router(connect.router)
 app.include_router(assistant.router)
+app.include_router(jobs_router_mod.router)
+app.include_router(notifications_router_mod.router)
 
 
 @app.on_event("startup")
@@ -128,6 +131,84 @@ def on_startup():
     _migrate_table("agent_profiles", {
         "last_seen_at": "TIMESTAMP",
     })
+
+    # Phase 2 — automation columns on agent_profiles
+    _migrate_table("agent_profiles", {
+        "agent_mode": "VARCHAR(20) DEFAULT 'chat'",
+        "billing_model": "VARCHAR(20) DEFAULT 'per_answer'",
+        "schedule_options": "TEXT[] DEFAULT '{daily}'",
+        "required_inputs_schema": "JSONB DEFAULT '[]'",
+        "price_per_run_credits": "INTEGER DEFAULT 50",
+        "price_weekly_credits": "INTEGER DEFAULT 500",
+    })
+
+    # Phase 2 — background_jobs, job_runs, notifications tables
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS background_jobs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    agent_id UUID NOT NULL REFERENCES agent_profiles(id) ON DELETE CASCADE,
+                    license_id UUID REFERENCES agent_licenses(id) ON DELETE SET NULL,
+                    config JSONB NOT NULL DEFAULT '{}',
+                    billing_model VARCHAR(20) NOT NULL DEFAULT 'per_run',
+                    schedule VARCHAR(20) NOT NULL DEFAULT 'daily',
+                    status VARCHAR(20) NOT NULL DEFAULT 'active',
+                    last_run_at TIMESTAMPTZ,
+                    next_run_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    run_count INTEGER NOT NULL DEFAULT 0,
+                    credits_spent_total INTEGER NOT NULL DEFAULT 0,
+                    billing_period_start TIMESTAMPTZ DEFAULT NOW(),
+                    billing_period_end TIMESTAMPTZ,
+                    output_methods TEXT[] NOT NULL DEFAULT '{in_app}',
+                    notification_email VARCHAR(255),
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS job_runs (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    job_id UUID NOT NULL REFERENCES background_jobs(id) ON DELETE CASCADE,
+                    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    completed_at TIMESTAMPTZ,
+                    status VARCHAR(20) NOT NULL DEFAULT 'running',
+                    result TEXT,
+                    error TEXT,
+                    credits_charged INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    job_id UUID REFERENCES background_jobs(id) ON DELETE SET NULL,
+                    job_run_id UUID REFERENCES job_runs(id) ON DELETE SET NULL,
+                    type VARCHAR(50) NOT NULL DEFAULT 'job_result',
+                    title VARCHAR(255) NOT NULL,
+                    body TEXT NOT NULL,
+                    read BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                )
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_background_jobs_user ON background_jobs(user_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_background_jobs_next_run
+                ON background_jobs(next_run_at) WHERE status = 'active'
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_job_runs_job ON job_runs(job_id)
+            """))
+            conn.execute(text("""
+                CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read)
+            """))
+            conn.commit()
+    except Exception as e:
+        logging.warning(f"Phase 2 table migration: {e}")
 
     _migrate_table("agent_posts", {
         "likes_count": "INTEGER DEFAULT 0",

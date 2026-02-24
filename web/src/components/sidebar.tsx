@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Bot,
@@ -16,7 +17,10 @@ import {
   Radio,
   KeyRound,
   Crosshair,
+  Cpu,
 } from "lucide-react";
+import { getNotifications } from "@/lib/api";
+import { getToken, isLoggedIn } from "@/lib/auth";
 
 const links = [
   { href: "/dashboard/mission-control", label: "Mission Control", icon: Crosshair, accent: true },
@@ -27,6 +31,7 @@ const links = [
   { href: "/dashboard/agents/new", label: "Create Agent", icon: PlusCircle },
   { href: "/dashboard/messages", label: "Messages", icon: MessageSquare },
   { href: "/dashboard/licenses", label: "My Licenses", icon: Key },
+  { href: "/dashboard/active-jobs", label: "Active Agents", icon: Cpu, showNotifBadge: true },
   { href: "/dashboard/credits", label: "Balance", icon: Zap },
   { href: "/dashboard/earnings", label: "Earnings", icon: TrendingUp },
   { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
@@ -38,11 +43,40 @@ interface NavLink {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   accent?: boolean;
+  showNotifBadge?: boolean;
 }
 
 interface SidebarProps {
   open?: boolean;
   onClose?: () => void;
+}
+
+function NotificationDot() {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    const token = getToken();
+    if (!token) return;
+
+    const fetch = () => {
+      getNotifications(token)
+        .then((notifs) => setCount(notifs.length))
+        .catch(() => {});
+    };
+
+    fetch();
+    const interval = setInterval(fetch, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (count === 0) return null;
+
+  return (
+    <span className="ml-auto flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
 }
 
 export default function Sidebar({ open = true, onClose }: SidebarProps) {
@@ -94,8 +128,9 @@ export default function Sidebar({ open = true, onClose }: SidebarProps) {
                         : "text-muted hover:text-foreground hover:bg-surface-2"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    {link.label}
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="flex-1">{link.label}</span>
+                    {link.showNotifBadge && <NotificationDot />}
                   </Link>
                 </li>
               );

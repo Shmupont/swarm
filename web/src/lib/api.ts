@@ -1128,6 +1128,100 @@ export async function sendTrialMessage(agentId: string, message: string, token: 
   });
 }
 
+// ── Background Jobs ────────────────────────────────────────────
+
+export interface BackgroundJob {
+  id: string;
+  user_id: string;
+  agent_id: string;
+  agent_name: string | null;
+  license_id: string | null;
+  config: Record<string, string>;
+  billing_model: string;
+  schedule: string;
+  status: string;
+  last_run_at: string | null;
+  next_run_at: string;
+  run_count: number;
+  credits_spent_total: number;
+  output_methods: string[];
+  notification_email: string | null;
+  created_at: string;
+  latest_result?: string | null;
+}
+
+export interface JobRun {
+  id: string;
+  job_id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  result: string | null;
+  error: string | null;
+  credits_charged: number;
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  job_id: string | null;
+  job_run_id: string | null;
+  type: string;
+  title: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+}
+
+export async function getActiveJobs(token: string) {
+  return apiFetch<BackgroundJob[]>("/jobs", { token });
+}
+
+export async function getJobDetails(token: string, jobId: string) {
+  return apiFetch<{ job: BackgroundJob; runs: JobRun[] }>(`/jobs/${jobId}`, { token });
+}
+
+export async function updateJobStatus(token: string, jobId: string, status: string) {
+  return apiFetch<BackgroundJob>(`/jobs/${jobId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+    token,
+  });
+}
+
+export async function startBackgroundJob(
+  token: string,
+  data: {
+    agent_id: string;
+    config: Record<string, string>;
+    schedule: string;
+    output_methods: string[];
+    notification_email?: string;
+  }
+) {
+  return apiFetch<BackgroundJob>("/jobs", {
+    method: "POST",
+    body: JSON.stringify(data),
+    token,
+  });
+}
+
+export async function getNotifications(token: string) {
+  return apiFetch<Notification[]>("/notifications", { token });
+}
+
+export async function markNotificationsRead(
+  token: string,
+  opts: { notification_ids?: string[]; all?: boolean }
+) {
+  return apiFetch<{ ok: boolean }>("/notifications/mark-read", {
+    method: "POST",
+    body: JSON.stringify(opts),
+    token,
+  });
+}
+
 // ── Assistant ──────────────────────────────────────────────────
 
 export interface AssistantMessage {
