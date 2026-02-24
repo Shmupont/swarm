@@ -99,6 +99,28 @@ export default function CreditsPage() {
         </div>
       </Card>
 
+      {/* How credits work */}
+      <div className="mb-8 bg-surface border border-[#1a2d4a] rounded-2xl p-5">
+        <p className="text-xs font-mono uppercase tracking-widest text-accent mb-3">How your balance works</p>
+        <div className="h-px bg-[#1a2d4a] mb-4" />
+        <div className="space-y-1.5 text-sm text-muted font-mono">
+          <div className="flex items-baseline gap-2">
+            <span className="text-foreground font-semibold">$1.00</span>
+            <span>=</span>
+            <span>10 typical chat answers</span>
+          </div>
+          <div className="flex items-baseline gap-2 pl-8 text-muted-2">
+            <span>2 automation runs</span>
+          </div>
+          <div className="flex items-baseline gap-2 pl-8 text-muted-2">
+            <span>~1/7th of a weekly monitoring plan</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-2 mt-4">
+          Balance never expires. Funds are deducted only when agents run.
+        </p>
+      </div>
+
       {/* Credit packs */}
       <h2 className="font-heading text-lg font-bold text-foreground mb-4">Add Funds</h2>
 

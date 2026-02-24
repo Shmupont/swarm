@@ -132,9 +132,10 @@ function PortalContent() {
             </div>
             <div className="flex items-center gap-3">
               {creditBalance !== null && (
-                <Link href="/credits" className="flex items-center gap-1.5 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-1.5 rounded-xl text-sm font-medium transition-colors">
+                <Link href="/dashboard/credits" className="flex items-center gap-2 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-1.5 rounded-xl text-sm font-medium transition-colors">
                   <Zap className="w-3.5 h-3.5" />
-                  {creditBalance.toLocaleString()}
+                  <span>Balance: ${(creditBalance / 100).toFixed(2)}</span>
+                  <span className="text-xs text-accent/70">↑ Add funds</span>
                 </Link>
               )}
               {user && (

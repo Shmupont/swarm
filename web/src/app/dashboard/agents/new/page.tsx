@@ -51,6 +51,7 @@ export default function CreateAgentPage() {
   const [billingModel, setBillingModel] = useState<"per_run" | "weekly">("per_run");
   const [requiredInputs, setRequiredInputs] = useState<RequiredInput[]>([]);
   const [outputMethods, setOutputMethods] = useState<string[]>(["in_app"]);
+  const [llmModel, setLlmModel] = useState("gpt-4o-mini");
 
   function addRequiredInput() {
     setRequiredInputs((prev) => [
@@ -92,6 +93,7 @@ export default function CreateAgentPage() {
       tags,
       listing_type: listingType,
       price_usd: parseFloat(priceUsd) || 0,
+      llm_model: llmModel,
     };
 
     if (listingType === "automation") {
@@ -372,6 +374,45 @@ export default function CreateAgentPage() {
             </div>
             <p className="text-xs text-muted mt-1.5">Default: $0.10 per answer. Set to 0 for free.</p>
           </div>
+        </Card>
+
+        {/* AI Model */}
+        <Card className="p-6 space-y-4">
+          <div>
+            <h2 className="font-heading font-bold text-foreground">AI Model</h2>
+            <p className="text-xs text-muted mt-1">Choose the AI that powers your agent. This affects response quality and your API costs.</p>
+          </div>
+          <div className="space-y-2">
+            {[
+              { value: "gpt-4o-mini", label: "GPT-4o Mini", desc: "Fast, affordable, great for most tasks", cost: "~$0.001/answer" },
+              { value: "gpt-4o", label: "GPT-4o", desc: "Smarter reasoning, complex tasks", cost: "~$0.01/answer" },
+              { value: "claude-haiku-3-5", label: "Claude Haiku", desc: "Anthropic's fastest model", cost: "~$0.001/answer" },
+              { value: "claude-sonnet-4-5", label: "Claude Sonnet", desc: "Anthropic's best balance", cost: "~$0.008/answer" },
+              { value: "custom", label: "Custom / BYO", desc: "I'll provide my own model config in settings", cost: "—" },
+            ].map((m) => (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => setLlmModel(m.value)}
+                className={`w-full flex items-center justify-between p-4 rounded-xl border-2 text-left transition-all ${
+                  llmModel === m.value
+                    ? "border-accent bg-accent-muted"
+                    : "border-surface-2 bg-surface-2 hover:border-muted-2"
+                }`}
+              >
+                <div>
+                  <p className="font-heading font-bold text-foreground text-sm">{m.label}</p>
+                  <p className="text-xs text-muted mt-0.5">{m.desc}</p>
+                </div>
+                <span className="text-xs text-muted-2 font-mono shrink-0 ml-4">{m.cost}</span>
+              </button>
+            ))}
+          </div>
+          {llmModel === "custom" && (
+            <p className="text-xs text-muted bg-surface-2 rounded-xl px-4 py-3">
+              Configure your model, API key, and provider in Agent Settings after creation.
+            </p>
+          )}
         </Card>
 
         {/* Tags */}

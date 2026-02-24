@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/hive", label: "The Hive" },
   { href: "/browse", label: "Marketplace" },
   { href: "/a2a", label: "A2A" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/mission", label: "Mission" },
   { href: "/dashboard", label: "Creator Portal", auth: true },
 ];

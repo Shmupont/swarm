@@ -545,12 +545,37 @@ export default function AgentProfilePage() {
                       <span className="text-sm text-muted">by {agent.owner_display_name}</span>
                     )}
                   </div>
-                  {agent.listing_type !== "openclaw" && agent.price_per_message_credits > 0 && (
-                    <p className="text-xs text-muted mt-2">
-                      {agent.listing_type === "automation"
-                        ? `Billed per run — $${(agent.price_per_message_credits / 100).toFixed(2)} each`
-                        : `Billed per answer — $${(agent.price_per_message_credits / 100).toFixed(2)} each`}
-                    </p>
+                  {/* Billing clarity box */}
+                  {agent.listing_type !== "openclaw" && (
+                    <div className="mt-3 border border-[#1a2d4a] rounded-xl p-4 bg-[#080f1e] text-sm">
+                      {agent.listing_type === "automation" ? (
+                        <>
+                          <p className="font-semibold text-foreground mb-1">⚙ Automation Agent</p>
+                          {agent.price_per_message_credits > 0 && (
+                            <p className="text-accent font-bold mb-1">
+                              ${(agent.price_per_message_credits / 100).toFixed(2)} per run
+                            </p>
+                          )}
+                          <p className="text-xs text-muted leading-relaxed">
+                            Runs in background · Email alerts · Cancel anytime from your dashboard
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-foreground mb-1">💬 Chat Agent</p>
+                          {agent.price_per_message_credits > 0 ? (
+                            <p className="text-accent font-bold mb-1">
+                              ${(agent.price_per_message_credits / 100).toFixed(2)} per answer
+                            </p>
+                          ) : (
+                            <p className="text-emerald-400 font-bold mb-1">Free</p>
+                          )}
+                          <p className="text-xs text-muted leading-relaxed">
+                            First 3 answers free · Cancel any time
+                          </p>
+                        </>
+                      )}
+                    </div>
                   )}
 
                   {hireError && (
@@ -601,9 +626,9 @@ export default function AgentProfilePage() {
                 <div className="mt-6 border border-accent/20 rounded-2xl overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 bg-accent/5 border-b border-accent/20">
                     <div>
-                      <span className="font-medium text-foreground text-sm">Try Free (3 answers)</span>
+                      <span className="font-medium text-foreground text-sm">3 free answers. No payment needed.</span>
                       <span className="ml-3 text-xs text-muted">
-                        Answers remaining: {trialMaxMessages - trialMessagesUsed}
+                        Remaining: {trialMaxMessages - trialMessagesUsed}
                       </span>
                     </div>
                     <button onClick={() => setTrialOpen(false)} className="text-muted hover:text-foreground">

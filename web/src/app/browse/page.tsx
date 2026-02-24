@@ -28,6 +28,13 @@ export default function BrowsePage() {
   );
 }
 
+const AGENT_TYPES = [
+  { value: "", label: "All Types" },
+  { value: "chat", label: "💬 Chat" },
+  { value: "automation", label: "⚙ Automation" },
+  { value: "openclaw", label: "🔌 OpenClaw" },
+];
+
 function BrowseContent() {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") || "";
@@ -40,6 +47,7 @@ function BrowseContent() {
   const [category, setCategory] = useState(initialCategory);
   const [sort, setSort] = useState(initialSort);
   const [page, setPage] = useState(1);
+  const [agentType, setAgentType] = useState("");
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {});
@@ -114,6 +122,23 @@ function BrowseContent() {
 
           <SearchBar onSearch={handleSearch} className="mb-6" />
 
+          {/* Agent type filter chips */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {AGENT_TYPES.map((t) => (
+              <button
+                key={t.value}
+                onClick={() => { setAgentType(t.value); setPage(1); }}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
+                  agentType === t.value
+                    ? "bg-accent text-background"
+                    : "bg-surface text-muted hover:text-foreground hover:bg-surface-2"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
           {/* Category filter pills */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
@@ -173,7 +198,7 @@ function BrowseContent() {
                 <Skeleton key={i} className="h-72" />
               ))}
             </div>
-          ) : agents.length === 0 ? (
+          ) : agents.filter((a) => !agentType || a.listing_type === agentType).length === 0 ? (
             (search || category) ? (
               <EmptyState
                 icon={<SlidersHorizontal className="w-12 h-12" />}
@@ -197,7 +222,7 @@ function BrowseContent() {
             )
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {agents.map((agent, i) => (
+              {agents.filter((a) => !agentType || a.listing_type === agentType).map((agent, i) => (
                 <motion.div
                   key={agent.id}
                   initial={{ opacity: 0, y: 10 }}
