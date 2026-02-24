@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_connect_client_id: str = ""
-    anthropic_api_key: str = ""  # Platform-level fallback key
+    anthropic_api_key: str = ""  # Original Anthropic key
+    anthropic_api_2: str = ""  # Platform-level fallback key for agent chat
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -6,7 +6,7 @@ from .encryption import decrypt_api_key
 def _platform_api_key() -> str | None:
     """Return the platform Anthropic API key if configured."""
     from .config import get_settings
-    key = get_settings().anthropic_api_key
+    key = get_settings().anthropic_api_2
     return key if key else None
 
 
