@@ -45,7 +45,7 @@ from ..schemas import (
     WebhookConfigResponse,
 )
 from ..encryption import encrypt_api_key, mask_api_key
-from ..llm import validate_api_key
+from ..llm import validate_api_key, has_platform_key
 from ..slug import ensure_unique_slug, generate_slug
 from ..webhook import generate_webhook_secret, ping_webhook
 
@@ -56,7 +56,8 @@ def _enrich(profile: AgentProfile, session: Session) -> AgentResponse:
     resp = AgentResponse.model_validate(profile)
     owner = session.get(User, profile.owner_id)
     resp.owner_display_name = (owner.display_name or owner.email) if owner else None
-    resp.is_chat_ready = bool((profile.system_prompt or profile.openai_assistant_id) and profile.has_api_key)
+    has_llm = profile.has_api_key or has_platform_key()
+    resp.is_chat_ready = bool((profile.system_prompt or profile.openai_assistant_id) and has_llm)
     resp.is_free = profile.is_free
     resp.price_per_conversation_cents = profile.price_per_conversation_cents
     resp.price_per_message_cents = profile.price_per_message_cents
@@ -408,7 +409,7 @@ def get_brain_status(
         "model": agent.llm_model,
         "temperature": agent.temperature,
         "max_tokens": agent.max_tokens,
-        "is_chat_ready": bool(agent.system_prompt and agent.has_api_key),
+        "is_chat_ready": bool(agent.system_prompt and (agent.has_api_key or has_platform_key())),
         "pricing": {
             "is_free": agent.is_free,
             "per_conversation_cents": agent.price_per_conversation_cents,
@@ -639,17 +640,26 @@ def send_trial_message(
 
     # Call agent LLM if configured, otherwise use generic response
     response_text = ""
-    if agent.system_prompt and agent.has_api_key and agent.encrypted_api_key:
+    if agent.system_prompt and (agent.has_api_key and agent.encrypted_api_key or has_platform_key()):
         try:
-            from ..llm import call_agent
-            result = call_agent(
-                encrypted_api_key=agent.encrypted_api_key,
-                system_prompt=agent.system_prompt,
-                messages=[{"role": "user", "content": data.message}],
-                model=agent.llm_model,
-                temperature=agent.temperature,
-                max_tokens=agent.max_tokens,
-            )
+            from ..llm import call_agent, call_agent_platform
+            if agent.has_api_key and agent.encrypted_api_key:
+                result = call_agent(
+                    encrypted_api_key=agent.encrypted_api_key,
+                    system_prompt=agent.system_prompt,
+                    messages=[{"role": "user", "content": data.message}],
+                    model=agent.llm_model,
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                )
+            else:
+                result = call_agent_platform(
+                    system_prompt=agent.system_prompt,
+                    messages=[{"role": "user", "content": data.message}],
+                    model="claude-haiku-4-5-20251001",
+                    temperature=agent.temperature,
+                    max_tokens=agent.max_tokens,
+                )
             response_text = result["content"]
         except Exception:
             response_text = f"Hi! I'm {agent.name}. This is a trial — hire me to unlock the full experience."

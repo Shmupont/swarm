@@ -14,7 +14,7 @@ from ..schemas import (
     ChatMessageResponse,
     ChatResponse,
 )
-from ..llm import call_agent
+from ..llm import call_agent, call_agent_platform, has_platform_key
 
 
 def _call_openai_assistant(
@@ -126,7 +126,8 @@ def start_session(
     ).first()
     if not agent:
         raise HTTPException(404, "Agent not found")
-    if not agent.has_api_key or not agent.encrypted_api_key:
+    agent_has_key = agent.has_api_key and agent.encrypted_api_key
+    if not agent_has_key and not has_platform_key():
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
     if not agent.system_prompt and not agent.openai_assistant_id:
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
@@ -180,7 +181,10 @@ def send_message(
         raise HTTPException(400, "Session is closed")
 
     agent = session.get(AgentProfile, chat_session.agent_profile_id)
-    if not agent or not agent.encrypted_api_key:
+    if not agent:
+        raise HTTPException(503, detail={"detail": "Agent not found", "code": "not_configured"})
+    agent_has_key = agent.has_api_key and agent.encrypted_api_key
+    if not agent_has_key and not has_platform_key():
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
     if not agent.system_prompt and not agent.openai_assistant_id:
         raise HTTPException(503, detail={"detail": "Agent not configured yet", "code": "not_configured"})
@@ -239,12 +243,21 @@ def send_message(
                 db_session=session,
                 message=data.content,
             )
-        else:
+        elif agent.has_api_key and agent.encrypted_api_key:
             result = call_agent(
                 encrypted_api_key=agent.encrypted_api_key,
                 system_prompt=agent.system_prompt or "",
                 messages=messages,
                 model=agent.llm_model,
+                temperature=agent.temperature,
+                max_tokens=agent.max_tokens,
+            )
+        else:
+            # Platform key fallback — use haiku to keep costs low
+            result = call_agent_platform(
+                system_prompt=agent.system_prompt or "",
+                messages=messages,
+                model="claude-haiku-4-5-20251001",
                 temperature=agent.temperature,
                 max_tokens=agent.max_tokens,
             )
