@@ -56,9 +56,9 @@ export function NavBar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 rounded-xl bg-[#04080f] border border-[#1a2d4a] flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
+              <span className="text-blue-500 font-bold text-sm">S</span>
             </div>
-            <span className="font-display font-bold text-lg text-white tracking-tight">
+            <span className="font-display font-bold text-lg text-blue-500 tracking-tight">
               SWARM
             </span>
           </Link>
