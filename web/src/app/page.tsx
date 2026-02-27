@@ -30,7 +30,7 @@ export default function HomePage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <h1
-              className="font-display font-bold text-blue-500 leading-none"
+              className="font-display font-bold text-red-500 leading-none"
               style={{
                 fontSize: "clamp(6rem, 15vw, 16rem)",
               }}
