@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:xVdaBmfhuUcdFYMQWAbSPjTvlALNaFKK@switchback.proxy.rlwy.net:54371/railway",
+    os.environ.get("DATABASE_URL", ""),
 )
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 POLL_INTERVAL_SECONDS = 60

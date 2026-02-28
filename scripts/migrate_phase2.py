@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """
 Phase 2 database migration — background jobs, job runs, notifications,
@@ -8,7 +9,7 @@ import psycopg2
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:xVdaBmfhuUcdFYMQWAbSPjTvlALNaFKK@switchback.proxy.rlwy.net:54371/railway",
+    os.environ.get("DATABASE_URL", ""),
 )
 
 

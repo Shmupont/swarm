@@ -1,3 +1,4 @@
+import os
 """
 Seed demo agents into the SWARM marketplace.
 Run: python scripts/seed_agents.py
@@ -7,7 +8,7 @@ import psycopg2
 import json
 from datetime import datetime, timezone
 
-DB_URL = "postgresql://postgres:xVdaBmfhuUcdFYMQWAbSPjTvlALNaFKK@switchback.proxy.rlwy.net:54371/railway"
+DB_URL = os.environ.get("DATABASE_URL", "")
 OWNER_ID = "404195e4-79a4-4ec2-a4d6-dd4fb95f3a89"  # colemansdupont@gmail.com
 
 def utcnow():

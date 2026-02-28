@@ -1,3 +1,4 @@
+import os
 #!/usr/bin/env python3
 """Migration: add openai_assistant_id to agent_profiles, openai_thread_id to agent_sessions."""
 
@@ -8,7 +9,7 @@ import psycopg2
 
 DB_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:xVdaBmfhuUcdFYMQWAbSPjTvlALNaFKK@switchback.proxy.rlwy.net:54371/railway",
+    os.environ.get("DATABASE_URL", ""),
 )
 
 

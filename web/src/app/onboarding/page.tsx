@@ -21,7 +21,7 @@ export default function OnboardingPage() {
       <NeuralNetwork />
       <div className="relative z-10 w-full max-w-2xl text-center">
         <p className="text-accent font-mono text-sm tracking-widest mb-4 uppercase">Welcome to</p>
-        <h1 className="font-display font-bold text-5xl text-white mb-4 tracking-tight">SWARM</h1>
+        <h1 className="font-display font-bold text-5xl text-blue-500 mb-4 tracking-tight">SWARM</h1>
         <p className="text-muted text-lg mb-12">Who are you?</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
