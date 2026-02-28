@@ -30,9 +30,10 @@ export default function HomePage() {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <h1
-              className="font-display font-bold text-white leading-none"
+              className="font-display font-bold leading-none"
               style={{
                 fontSize: "clamp(6rem, 15vw, 16rem)",
+                color: "#ffffff",
               }}
             >
               SWARM
